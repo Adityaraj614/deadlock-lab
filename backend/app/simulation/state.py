@@ -15,9 +15,12 @@ class SimulationState(BaseModel):
 
     current_step: int = Field(default=0, ge=0)
     is_running: bool = False
+    is_finished: bool = False
 
     @model_validator(mode="after")
     def validate_unique_ids(self):
+        """Ensure all entities have unique IDs within their category."""
+
         agent_ids = [agent.id for agent in self.agents]
         obstacle_ids = [obstacle.id for obstacle in self.obstacles]
         goal_ids = [goal.id for goal in self.goals]
