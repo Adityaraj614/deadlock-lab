@@ -1,5 +1,5 @@
 from app.simulation.state import SimulationState
-from app.simulation.multi_agent_executor import MultiAgentExecutor
+from app.simulation.multi_agent_executor import MultiAgentExecutor, CoordinationStrategy
 from app.metrics.metrics import SimulationMetrics
 from typing import Optional
 
@@ -46,6 +46,7 @@ class SimulationEngine:
         grid_width: int | None = None,
         grid_height: int | None = None,
         reservation_table: object | None = None,
+        strategy: CoordinationStrategy = CoordinationStrategy.FULL,
     ) -> SimulationState:
         """Advance the simulation by one timestep.
 
@@ -53,6 +54,8 @@ class SimulationEngine:
         If ``actions`` is empty or ``None``, all agents wait.
         ``grid_width`` and ``grid_height`` are the simulation grid dimensions.
         If not provided, defaults of 10x10 are used.
+        ``strategy`` controls the coordination strategy to use during the step.
+        The default ``CoordinationStrategy.FULL`` preserves the existing behavior.
         """
 
         if self.state.is_finished:
@@ -79,6 +82,7 @@ class SimulationEngine:
             time=self.state.current_step,
             reservation_table=reservation_table,
             metrics=self.metrics,
+            strategy=strategy,
         )
 
         self.state.current_step += 1

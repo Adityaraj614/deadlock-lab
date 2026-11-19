@@ -8,6 +8,18 @@ from app.models.position import Position
 from app.simulation.state import SimulationState
 
 
+from enum import Enum
+
+
+class CoordinationStrategy(Enum):
+    """Supported coordination strategies for multi-agent simulation."""
+
+    FULL = "full"  # Full integration: conflicts + reservation table + deadlocks
+    PRIORITY = "priority"  # Priority-based: conflicts + priorities, no deadlock check
+    RESERVATION = "reservation"  # Reservation-based: only reservation table checks
+    DEADLOCK = "deadlock"  # Deadlock-aware: conflicts + deadlock detection only
+
+
 class MultiAgentExecutor:
     """Coordinates simultaneous actions for multiple agents.
 
@@ -17,6 +29,10 @@ class MultiAgentExecutor:
 
     Optional metrics collection is available through the ``metrics``
     parameter of ``execute()``.
+
+    The ``coordination_strategy`` parameter controls which coordination
+    checks are performed during each simulation step. The default strategy
+    ``CoordinationStrategy.FULL`` preserves the existing behavior.
     """
 
     MOVEMENTS = {
@@ -207,27 +223,41 @@ class MultiAgentExecutor:
     @staticmethod
     def resolve_conflicts(
         state: SimulationState,
-        proposals: dict[str, Position],
-        priorities: Optional[dict[str, int]] = None,
+        proposals: dict[str, int],
+        strategy: CoordinationStrategy = CoordinationStrategy.FULL,
     ) -> set[str]:
         """Identify all agents involved in movement conflicts.
 
         Conflicts include vertex (destination), edge (head-on swap), and
         occupied-destination collisions. Priorities can be provided to
         break ties.
+
+        Args:
+            state: The simulation state.
+            proposals: The proposed destinations for each agent.
+            strategy: The coordination strategy to use.
+
+        Returns:
+            A set of agent IDs involved in conflicts.
         """
 
         vertex_conflicts = MultiAgentExecutor.detect_vertex_conflicts(proposals)
 
-        edge_conflicts = MultiAgentExecutor.detect_edge_conflicts(
-            state, proposals
-        )
-
-        occupied_conflicts = (
-            MultiAgentExecutor.detect_occupied_destination_conflicts(
+        if strategy == CoordinationStrategy.FULL or strategy == CoordinationStrategy.DEADLOCK:
+            edge_conflicts = MultiAgentExecutor.detect_edge_conflicts(
                 state, proposals
             )
-        )
+        else:
+            edge_conflicts = set()
+
+        if strategy == CoordinationStrategy.FULL or strategy == CoordinationStrategy.PRIORITY:
+            occupied_conflicts = (
+                MultiAgentExecutor.detect_occupied_destination_conflicts(
+                    state, proposals
+                )
+            )
+        else:
+            occupied_conflicts = set()
 
         all_conflicts = vertex_conflicts | edge_conflicts | occupied_conflicts
 
@@ -333,6 +363,7 @@ class MultiAgentExecutor:
         time: int = 0,
         reservation_table: Optional[ReservationTable] = None,
         metrics: Optional[object] = None,
+        strategy: CoordinationStrategy = CoordinationStrategy.FULL,
     ) -> SimulationState:
         """Execute one complete multi-agent simulation timestep.
 
@@ -349,6 +380,10 @@ class MultiAgentExecutor:
 
         If ``metrics`` is provided, its recording methods are called to
         track simulation progress.
+
+        The ``strategy`` parameter controls which coordination checks are
+        performed. The default ``CoordinationStrategy.FULL`` preserves the
+        existing behavior.
         """
 
         # Step 1: Calculate movement proposals.
@@ -357,10 +392,12 @@ class MultiAgentExecutor:
         )
 
         # Step 2: Detect movement conflicts.
-        conflicts = MultiAgentExecutor.resolve_conflicts(state, proposals)
+        conflicts = MultiAgentExecutor.resolve_conflicts(
+            state, proposals, strategy
+        )
 
         # Step 3: Check reservation table for additional conflicts.
-        if reservation_table is not None:
+        if reservation_table is not None and strategy == CoordinationStrategy.FULL:
             res_conflicts: set[str] = set()
             for agent_id, destination in proposals.items():
                 agent = next(
@@ -386,15 +423,18 @@ class MultiAgentExecutor:
             conflicts |= res_conflicts
 
         # Step 4: Detect deadlocked agents.
-        deadlocked_agents = DeadlockDetector.detect_deadlocks(
-            state, proposals
-        )
+        if strategy == CoordinationStrategy.FULL or strategy == CoordinationStrategy.DEADLOCK:
+            deadlocked_agents = DeadlockDetector.detect_deadlocks(
+                state, proposals
+            )
+        else:
+            deadlocked_agents = set()
 
         # Step 5: Combine movement conflicts and deadlocks.
         all_blocked_agents = conflicts | deadlocked_agents
 
         # Step 6: Update reservation table with non-conflicting proposals.
-        if reservation_table is not None:
+        if reservation_table is not None and strategy == CoordinationStrategy.FULL:
             # Reserve vertices and edges for agents not in the blocked set.
             for agent_id, destination in proposals.items():
                 if agent_id in all_blocked_agents:

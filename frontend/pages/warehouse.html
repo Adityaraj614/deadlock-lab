@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deadlock Lab - Warehouse Lab</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/workspace.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!----- A. Top Navbar (fixed height, full width) ----->
+        <header class="warehouse-header">
+            <div class="navbar-left">
+                <span class="logo">Deadlock</span> Lab
+            </div>
+            <div class="navbar-center">
+                <h1 class="page-title">Warehouse Lab</h1>
+            </div>
+            <div class="navbar-right">
+                <span class="api-status-indicator">
+                    <span class="status-dot disconnected" id="api-status"></span>
+                    <span class="status-text">Disconnected</span>
+                </span>
+                <button class="btn btn-secondary" onclick="navigateBackHome()">Back to Home</button>
+            </div>
+        </header>
+        
+        <!----- B. Main Layout (three-column: sidebar | central + right panel) ----->
+        <main class="main-layout">
+            
+            <!----- C. Left Sidebar (260px, independent vertical scroll) ----->
+            <aside class="grid-area" role="navigation">
+                <div class="sidebar-header">
+                    <span class="sidebar-caption">Warehouse Lab</span>
+                    <button class="btn btn-link back-home" onclick="navigateBackHome()" aria-label="Back to Home">
+                        ← Home
+                    </button>
+                </div>
+                
+                <!-- Navigation Sections -->
+                <div class="nav-sections">
+                    <div class="nav-section">
+                        <div class="nav-section-title">Overview</div>
+                        <div class="nav-items">
+                            <button class="nav-item" onclick="showOverview()">Overview</button>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">Environment</div>
+                        <div class="nav-items">
+                            <button class="nav-item" onclick="showEnvironment()">Environment</button>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">Simulation</div>
+                        <div class="nav-items">
+                            <button class="nav-item" onclick="showSimulation()">Simulation</button>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">Algorithms</div>
+                        <div class="nav-items">
+                            <button class="nav-item" onclick="showAlgorithms()">Algorithms</button>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">Learning</div>
+                        <div class="nav-items">
+                            <button class="nav-item" onclick="showLearning()">Learning</button>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">Experiments</div>
+                        <div class="nav-items">
+                            <button class="nav-item" onclick="showExperiments()">Experiments</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Scenario Selection Section -->
+                <div class="scenario-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-default);">
+                    <div class="nav-section-title">Scenario</div>
+                    <div class="nav-items" style="padding: 0.5rem 1.25rem;">
+                        <select class="scenario-select" id="scenario-select" onchange="handleScenarioChange()">
+                            <option value="" disabled selected>Select scenario</option>
+                            <option value="simple_warehouse">Simple Warehouse 10x10</option>
+                            <option value="narrow_corridor">Narrow Corridor 5x10</option>
+                            <option value="congested_warehouse">Congested Warehouse 12x12</option>
+                        </select>
+                    </div>
+                </div>
+            </aside>
+            
+            <!----- D. Main Content Area ----->
+            <main class="main-content" role="main">
+                <!----- D.1 Title and Scenario Info ----->
+                <div class="workspace-header">
+                    <h2>Warehouse Simulation</h2>
+                    <div class="scenario-info">
+                        <span class="scenario-name" id="scenario-name">No scenario loaded</span>
+                        <span class="grid-dimensions" id="grid-dimensions">10x10 Grid</span>
+                        <span class="simulation-state" id="simulation-state">Stopped</span>
+                    </div>
+                </div>
+                
+                <!----- D.2 Main Simulation Canvas ----->
+                <div class="main-simulation">
+                    <div class="canvas-wrapper">
+                        <canvas id="warehouseCanvas" aria-label="Warehouse grid visualization"></canvas>
+                    </div>
+                    
+                    <div class="empty-state" id="empty-state">
+                        <span>Select a scenario to initialize the warehouse environment.</span>
+                    </div>
+                    
+                    <!-- Grid container for JS warehouse-grid integration -->
+                    <div id="warehouse-grid" class="hidden"></div>
+                </div>
+                
+                <!----- D.3 Simulation Controls ----->
+                <div class="controls-section">
+                    <div class="section-title">Simulation Controls</div>
+                    <div class="action-btns">
+                        <button class="btn-action" id="load-scenario" disabled>Load Scenario</button>
+                        <button class="btn-action" id="run-simulation" disabled>Run</button>
+                        <button class="btn-action" id="step-simulation" disabled>Step</button>
+                        <button class="btn-action" id="reset-simulation">Reset</button>
+                    </div>
+                    <div class="speed-control">
+                        <span class="label">Speed</span>
+                        <select id="speed-select">
+                            <option value="1">1x</option>
+                            <option value="5">5x</option>
+                            <option value="10">10x</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!----- D.4 Metrics Panel ----->
+                <div class="metrics-grid" id="metrics-panel">
+                    <!-- Metrics will be populated by JavaScript -->
+                    <div class="metric-card">
+                        <div class="metric-value" id="total-steps">0</div>
+                        <div class="metric-label">Steps</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="completed-agents">0</div>
+                        <div class="metric-label">Completed</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="waiting-agents">0</div>
+                        <div class="metric-label">Waiting</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="blocked-agents">0</div>
+                        <div class="metric-label">Blocked</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="deadlocks">0</div>
+                        <div class="metric-label">Deadlocks Detected</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="collisions">0</div>
+                        <div class="metric-label">Collisions Prevented</div>
+                    </div>
+                </div>
+                
+                <!----- D.5 Event Log ----->
+                <div class="event-log-section" id="event-log-section">
+                    <div class="event-log-header">Event Log</div>
+                    <div class="event-log-body" id="event-log-body">
+                        <span>Select a scenario to begin simulation</span>
+                    </div>
+                </div>
+            </main>
+            
+            <!----- E. Right Information Panel (~290px) ----->
+            <aside class="side-panel" role="complementary">
+                <!-- Scenario Details Section -->
+                <div class="info-section" id="info-scenario">
+                    <div class="section-title">Scenario Details</div>
+                    <div class="content" id="info-scenario-details">
+                        <p>No scenario loaded</p>
+                    </div>
+                </div>
+                
+                <!-- Agent Information Section -->
+                <div class="info-section" id="info-agents">
+                    <div class="section-title">Agent Information</div>
+                    <div class="content" id="info-agents">
+                        <p>No agents loaded</p>
+                    </div>
+                </div>
+                
+                <!-- Selected Agent Details Section -->
+                <div class="info-section" id="info-selected">
+                    <div class="section-title">Selected Agent</div>
+                    <div class="content" id="info-selected-agent">
+                        <p>No agent selected</p>
+                    </div>
+                </div>
+                
+                <!-- Simulation Status Section -->
+                <div class="info-section" id="info-status">
+                    <div class="section-title">Simulation Status</div>
+                    <div class="content" id="info-status-text">
+                        <p>Simulation stopped</p>
+                    </div>
+                </div>
+                
+                <!-- Recent Events Section -->
+                <div class="info-section" id="info-events">
+                    <div class="section-title">Recent Events</div>
+                    <div class="content" id="info-events">
+                        <p>No events</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+    
+    <!-- JavaScript Files -->
+    <script src="../js/api.js"></script>
+    <script src="../js/navigation.js"></script>
+    <script src="../js/warehouse.js"></script>
+    
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="../css/global.css">
+    <!-- Warehouse CSS -->
+    <link rel="stylesheet" href="../css/workspace.css">
+</body>
+</html>
