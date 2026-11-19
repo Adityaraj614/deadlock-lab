@@ -29,10 +29,14 @@ class SimulationEngine:
             self.metrics.completed_agents = 0
             self.metrics.waiting_agents = 0
             self.metrics.blocked_agents = 0
+            self.metrics.waiting_steps = 0
+            self.metrics.blocked_events = 0
             self.metrics.collisions_prevented = 0
             self.metrics.deadlocks_detected = 0
             self.metrics.deadlock_recovery_attempts = 0
             self.metrics.successful_recoveries = 0
+            self.metrics.deadlock_incidents = 0
+            self.metrics.clear_deadlock_incident()
             self.metrics.total_path_length = 0.0
             self.metrics.average_steps_per_completed = 0.0
             self.metrics.simulation_complete = False

@@ -3,9 +3,10 @@ from typing import Optional
 from app.algorithms.deadlock_detector import DeadlockDetector
 from app.algorithms.reservation_table import ReservationTable, VertexKey, EdgeKey
 from app.models.action import Action, ActionType
-from app.models.agent import Agent
+from app.models.agent import Agent, AgentStatus
 from app.models.position import Position
 from app.simulation.state import SimulationState
+from app.algorithms.deadlock_resolver import DeadlockResolver
 
 
 from enum import Enum
@@ -289,17 +290,20 @@ class MultiAgentExecutor:
             if agent.id not in proposals:
                 continue
 
+            if agent.status == "completed":
+                continue
+
             if agent.id in conflicts:
-                agent.status = "waiting"
+                agent.status = AgentStatus.WAITING
                 continue
 
             new_position = proposals[agent.id]
 
             if new_position == agent.position:
-                agent.status = "idle"
+                agent.status = AgentStatus.IDLE
             else:
                 agent.position = new_position
-                agent.status = "moving"
+                agent.status = AgentStatus.MOVING
 
         return new_state
 
@@ -465,6 +469,31 @@ class MultiAgentExecutor:
             state, proposals, all_blocked_agents
         )
 
+        # Recover only a newly observed deadlock. A persistent cycle is kept
+        # active in the metrics object and is not counted repeatedly.
+        if deadlocked_agents and metrics is not None:
+            is_new_incident = True
+            if metrics is not None and hasattr(metrics, "record_deadlock_incident"):
+                is_new_incident = metrics.record_deadlock_incident(deadlocked_agents)
+            if is_new_incident:
+                recovered = DeadlockResolver.recover_deadlock(
+                    new_state,
+                    deadlocked_agents,
+                    grid_width,
+                    grid_height,
+                )
+                if metrics is not None and hasattr(metrics, "record_deadlock_recovery_attempt"):
+                    metrics.record_deadlock_recovery_attempt()
+                if recovered:
+                    remaining = DeadlockDetector.detect_deadlocks(
+                        new_state,
+                        {agent.id: agent.position for agent in new_state.agents},
+                    )
+                    if not remaining and metrics is not None and hasattr(metrics, "record_successful_recovery"):
+                        metrics.record_successful_recovery()
+        elif metrics is not None and hasattr(metrics, "clear_deadlock_incident"):
+            metrics.clear_deadlock_incident()
+
         # Step 8: Record metrics if available.
         if metrics is not None:
             if hasattr(metrics, "record_step"):
@@ -472,15 +501,18 @@ class MultiAgentExecutor:
             if hasattr(metrics, "record_collision_prevented"):
                 # Count prevented collisions as the number of agents that
                 # were blocked from moving due to conflicts.
-                pass  # counted indirectly via conflict detection
+                for _ in conflicts:
+                    metrics.record_collision_prevented()
+            if hasattr(metrics, "record_blocked_events"):
+                metrics.record_blocked_events(len(all_blocked_agents))
 
             if hasattr(metrics, "record_deadlock_detected"):
-                if deadlocked_agents:
+                if deadlocked_agents and not hasattr(metrics, "record_deadlock_incident"):
                     metrics.record_deadlock_detected()
 
             if hasattr(metrics, "record_deadlock_recovery_attempt"):
-                if deadlocked_agents:
-                    metrics.record_deadlock_recovery_attempt()
+                # Recovery attempts are recorded at the resolver call above.
+                pass
 
             if hasattr(metrics, "record_successful_recovery"):
                 pass  # recovery success tracked separately

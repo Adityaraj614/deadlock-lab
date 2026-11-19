@@ -1,445 +1,176 @@
-/**
- * Deadlock Lab Warehouse JavaScript
- * Handles grid visualization, simulation controls, and metrics.
- */
+import {
+    checkConnection,
+    loadScenario,
+    simulateStep,
+    simulateRun,
+    simulateReset,
+    simulatePause,
+    simulateResume,
+    formatStep,
+} from './api.js?v=3';
+import { navigateBackHome } from './navigation.js';
+
+let currentState = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize modules
-    initNavigation();
-    initAPI();
-    initEventListeners();
-    
-    // Check backend connection
+    window.navigateBackHome = navigateBackHome;
+    document.getElementById('scenario-select')?.addEventListener('change', handleLoadScenario);
+    document.getElementById('load-scenario')?.addEventListener('click', handleLoadScenario);
+    document.getElementById('run-simulation')?.addEventListener('click', handleRunSimulation);
+    document.getElementById('step-simulation')?.addEventListener('click', handleStepSimulation);
+    document.getElementById('pause-simulation')?.addEventListener('click', handlePauseSimulation);
+    document.getElementById('resume-simulation')?.addEventListener('click', handleResumeSimulation);
+    document.getElementById('reset-simulation')?.addEventListener('click', handleResetSimulation);
     checkBackendStatus();
-    
-    // Initialize with no scenario loaded
-    clearWorkspace();
+    window.setInterval(checkBackendStatus, 5000);
 });
 
-/**
- * Initialize API service and connection checking.
- */
-function initAPI() {
-    // Check connection status interval
-    setInterval(() => {
-        checkBackendStatus();
-    }, 3000);
+function selectedStrategy() {
+    return document.getElementById('strategy-select')?.value || 'full';
 }
 
-/**
- * Initialize event listeners for the warehouse lab.
- */
-function initEventListeners() {
-    // Scenario select change
-    const scenarioSelect = document.getElementById('scenario-select');
-    if (scenarioSelect) {
-        scenarioSelect.addEventListener('change', handleScenarioChange);
-    }
-    
-    // Control buttons
-    const loadBtn = document.getElementById('load-scenario');
-    if (loadBtn) {
-        loadBtn.addEventListener('click', handleLoadScenario);
-    }
-    
-    const runBtn = document.getElementById('run-simulation');
-    if (runBtn) {
-        runBtn.addEventListener('click', handleRunSimulation);
-    }
-    
-    const stepBtn = document.getElementById('step-simulation');
-    if (stepBtn) {
-        stepBtn.addEventListener('click', handleStepSimulation);
-    }
-    
-    const resetBtn = document.getElementById('reset-simulation');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', handleResetSimulation);
-    }
+function selectedScenario() {
+    return document.getElementById('scenario-select')?.value || '';
 }
 
-/**
- * Initialize navigation highlighting.
- */
-function initNavigation() {
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            navLinks.forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
-        });
-    });
+async function checkBackendStatus() {
+    const connected = await checkConnection();
+    const dot = document.getElementById('api-status');
+    const text = document.querySelector('.status-text');
+    if (dot) dot.className = `status-dot ${connected ? 'connected' : 'disconnected'}`;
+    if (text) text.textContent = connected ? 'Connected' : 'Disconnected';
 }
-
-/**
- * Check backend connection status.
- */
-function checkBackendStatus() {
-    fetch('http://127.0.0.1:8000/health')
-        .then(response => {
-            if (response.ok) {
-                document.getElementById('api-status').textContent = 'Connected';
-                document.getElementById('api-status').className = 'api-status connected';
-            }
-        })
-        .catch(() => {
-            document.getElementById('api-status').textContent = 'Disconnected';
-            document.getElementById('api-status').className = 'api-status disconnected';
-        });
-}
-
-/**
- * Handle scenario selection change.
- */
-async function handleScenarioChange() {
-    const select = this;
-    const name = select.value;
-    const statusDiv = document.getElementById('scenario-status');
-    
-    if (!name) {
-        clearWorkspace();
-        return;
-    }
-    
-    showLoading();
-    disableControls(false);
-    
-    try {
-        // Load the scenario state
-        const state = await fetch(`http://127.0.0.1:8000/api/scenario/load/${name}`)
-            .then(res => res.json());
-        
-        displayScenarioState(state);
-        
-        // Update metrics
-        updateMetrics(state);
-        
-    } catch (error) {
-        console.error('Error loading scenario:', error);
-        showError('Failed to load scenario. The backend may not have the scenario configured.');
-    } finally {
-        hideLoading();
-        disableControls(true);
-    }
-}
-
-/**
- * Display the scenario state in the grid and UI.
- */
-function displayScenarioState(state) {
-    const gridDiv = document.getElementById('warehouse-grid');
-    const detailDiv = document.getElementById('scenario-details');
-    
-    if (!gridDiv || !detailDiv) return;
-    
-    // Clear previous grid
-    gridDiv.innerHTML = '';
-    
-    const gridWidth = state.grid_width || 10;
-    const gridHeight = state.grid_height || 10;
-    const agents = state.agents || [];
-    const obstacles = state.obstacles || [];
-    const goals = state.goals || [];
-    
-    // Update details
-    detailDiv.innerHTML = `
-        <div class="metric-card">
-            <strong>Grid:</strong> ${gridWidth}x${gridHeight}
-        </div>
-        <div class="metric-card">
-            <strong>Agents:</strong> ${agents.length}
-        </div>
-        <div class="metric-card">
-            <strong>Obstacles:</strong> ${obstacles.length}
-        </div>
-        <div class="metric-card">
-            <strong>Goals:</strong> ${goals.length}
-        </div>
-    `;
-    
-    // Draw grid on canvas
-    const canvas = document.getElementById('warehouseCanvas');
-    if (!canvas) return;
-    
-    const canvasCtx = canvas.getContext('2d');
-    if (!canvasCtx) return;
-    
-    // Set canvas size
-    const cellSize = 40;
-    canvas.width = gridWidth * cellSize;
-    canvas.height = gridHeight * cellSize;
-    
-    // Clear canvas
-    canvasCtx.fillStyle = '#0d1117';
-    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw obstacles
-    canvasCtx.fillStyle = '#f472b6'; // purple for obstacles
-    obstacles.forEach(obs => {
-        const x = obs.position.x * cellSize + cellSize * 0.1;
-        const y = obs.position.y * cellSize + cellSize * 0.1;
-        const size = cellSize * 0.8;
-        canvasCtx.fillRect(x, y, size, size);
-    });
-    
-    // Draw goals
-    canvasCtx.fillStyle = '#22c55e'; // green for goals
-    goals.forEach(goal => {
-        const x = goal.position.x * cellSize + cellSize * 0.1;
-        const y = goal.position.y * cellSize + cellSize * 0.1;
-        const size = cellSize * 0.8;
-        canvasCtx.fillRect(x, y, size, size);
-        // Add "G" text
-        canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.font = 'bold 16px sans-serif';
-        canvasCtx.textAlign = 'center';
-        canvasCtx.textBaseline = 'middle';
-        canvasCtx.fillText('G', x + cellSize * 0.4, y + cellSize * 0.4);
-    });
-    
-    // Draw agents
-    canvasCtx.fillStyle = '#3b82f6'; // blue for agents
-    agents.forEach(agent => {
-        const x = agent.position.x * cellSize + cellSize * 0.1;
-        const y = agent.position.y * cellSize + cellSize * 0.1;
-        const size = cellSize * 0.8;
-        
-        // Draw circle for agent
-        canvasCtx.beginPath();
-        canvasCtx.arc(x + cellSize * 0.4, y + cellSize * 0.4, cellSize * 0.35, 0, Math.PI * 2);
-        canvasCtx.fill();
-        
-        // Add "R" text
-        canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.font = 'bold 16px sans-serif';
-        canvasCtx.textAlign = 'center';
-        canvasCtx.textBaseline = 'middle';
-        canvasCtx.fillText('R', x + cellSize * 0.4, y + cellSize * 0.4);
-        
-        // Draw path (if moving)
-        if (agent.status === 'moving' || agent.status === 'MOVING') {
-            canvasCtx.strokeStyle = '#fbbf24';
-            canvasCtx.lineWidth = 2;
-            canvasCtx.beginPath();
-            canvasCtx.moveTo(x + cellSize * 0.4, y + cellSize * 0.4);
-            // Simple: draw toward goal
-            const gx = agent.goal.position.x * cellSize + cellSize * 0.4;
-            const gy = agent.goal.position.y * cellSize + cellSize * 0.4;
-            canvasCtx.lineTo(gx, gy);
-            canvasCtx.stroke();
-        }
-    });
-    
-    // Draw grid lines
-    canvasCtx.strokeStyle = var(--border-color);
-    canvasCtx.lineWidth = 1;
-    for (let i = 0; i <= gridWidth; i++) {
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(i * cellSize, 0);
-        canvasCtx.lineTo(i * cellSize, canvas.height);
-        canvasCtx.stroke();
-    }
-    for (let i = 0; i <= gridHeight; i++) {
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(0, i * cellSize);
-        canvasCtx.lineTo(canvas.width, i * cellSize);
-        canvasCtx.stroke();
-    }
-}
-
-/**
- * Update metrics display.
- */
-function updateMetrics(state) {
-    const metricsDiv = document.getElementById('metrics-panel');
-    if (!metricsDiv) return;
-    
-    const agents = state.agents || [];
-    const totalSteps = state.current_step || 0;
-    
-    let html = `
-        <div class="metric-value" id="total-steps">${formatStep(totalSteps)}</div>
-        <div class="metric-label">Steps</div>
-    `;
-    
-    if (agents.length > 0) {
-        const completed = agents.filter(a => a.status === 'completed' || a.status === 'COMPLETED').length;
-        const waiting = agents.filter(a => a.status === 'waiting' || a.status === 'WAITING').length;
-        const blocked = agents.filter(a => a.status === 'blocked' || a.status === 'BLOCKED').length;
-        
-        html += `
-            <div class="metric-item">
-                <div class="metric-value" id="completed-agents">${completed}</div>
-                <div class="metric-label">Completed</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-value" id="waiting-agents">${waiting}</div>
-                <div class="metric-label">Waiting</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-value" id="blocked-agents">${blocked}</div>
-                <div class="metric-label">Blocked</div>
-            </div>
-        `;
-    }
-    
-    metricsDiv.innerHTML = html;
-}
-
-/** --- Simulation Controls --- */
 
 async function handleLoadScenario() {
-    const select = document.getElementById('scenario-select');
-    const name = select.value;
-    
+    const name = selectedScenario();
     if (!name) return;
-    
-    showLoading();
-    disableControls(false);
-    
-    try {
-        const state = await fetch(`http://127.0.0.1:8000/api/scenario/load/${name}`)
-            .then(res => res.json());
-        
-        displayScenarioState(state);
-        updateMetrics(state);
-    } catch (error) {
-        showError('Failed to load scenario');
-    } finally {
-        hideLoading();
-        disableControls(true);
-    }
+    await request(async () => loadScenario(name, selectedStrategy()), 'Scenario loaded');
 }
 
 async function handleRunSimulation() {
-    const maxSteps = 100; // default
-    
-    showLoading();
-    disableControls(false);
-    
-    try {
-        const result = await fetch(`http://127.0.0.1:8000/api/simulate/run`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ max_steps: maxSteps })
-        }).then(res => res.json());
-        
-        updateMetricsFromRun(result);
-    } catch (error) {
-        showError('Failed to run simulation');
-    } finally {
-        hideLoading();
-        disableControls(true);
-    }
+    await request(async () => simulateRun(100, selectedStrategy()), 'Simulation run completed');
 }
 
 async function handleStepSimulation() {
-    // Get actions - for step, we'll use wait actions (no movement)
-    const actions = []; // Empty actions = all agents wait
-    
-    showLoading();
-    disableControls(false);
-    
+    await request(async () => simulateStep([], selectedStrategy()), 'Simulation stepped');
+}
+
+async function handlePauseSimulation() {
+    await request(simulatePause, 'Simulation paused');
+}
+
+async function handleResumeSimulation() {
+    await request(simulateResume, 'Simulation resumed');
+}
+
+async function handleResetSimulation() {
+    await request(simulateReset, 'Simulation reset');
+}
+
+async function request(operation, message) {
+    setBusy(true);
     try {
-        const state = await fetch(`http://127.0.0.1:8000/api/simulate/step`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ actions })
-        }).then(res => res.json());
-        
-        displayScenarioState(state);
-        updateMetrics(state);
+        const state = await operation();
+        currentState = state;
+        renderState(state);
+        addEvent(`${message} at step ${state.current_step}`);
     } catch (error) {
-        showError('Failed to step simulation');
+        addEvent(`Error: ${error.message}`);
     } finally {
-        hideLoading();
-        disableControls(true);
+        setBusy(false);
     }
 }
 
-function handleResetSimulation() {
-    showLoading();
-    disableControls(false);
-    
-    try {
-        const state = fetch(`http://127.0.0.1:8000/api/simulate/reset`)
-            .then(res => res.json());
-        
-        // Reset the canvas and UI
-        const canvas = document.getElementById('warehouseCanvas');
-        if (canvas) {
-            canvas.width = canvas.width; // reset
-        }
-        
-        const detailDiv = document.getElementById('scenario-details');
-        if (detailDiv) {
-            detailDiv.innerHTML = '';
-        }
-        
-        const metricsDiv = document.getElementById('metrics-panel');
-        if (metricsDiv) {
-            metricsDiv.innerHTML = '<div class="metric-value">0</div><div class="metric-label">Steps</div>';
-        }
-    } catch (error) {
-        showError('Failed to reset simulation');
-    } finally {
-        hideLoading();
-        disableControls(true);
+function setBusy(busy) {
+    document.querySelectorAll('.btn-action').forEach(button => {
+        button.disabled = busy || (!currentState && button.id !== 'reset-simulation');
+    });
+}
+
+function renderState(state) {
+    const width = state.grid_width || 10;
+    const height = state.grid_height || 10;
+    const canvas = document.getElementById('warehouseCanvas');
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+
+    const cell = Math.max(28, Math.min(48, Math.floor(640 / Math.max(width, height))));
+    canvas.width = width * cell;
+    canvas.height = height * cell;
+    context.fillStyle = '#090909';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawCells(context, state.obstacles || [], cell, '#6b5260', '');
+    drawCells(context, state.goals || [], cell, '#2f7d5a', 'G');
+    (state.agents || []).forEach(agent => {
+        const centerX = agent.position.x * cell + cell / 2;
+        const centerY = agent.position.y * cell + cell / 2;
+        context.beginPath();
+        context.fillStyle = agent.status === 'completed' ? '#10b981' : '#c6a15b';
+        context.arc(centerX, centerY, cell * 0.3, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = '#090909';
+        context.font = `bold ${Math.max(11, cell * 0.28)}px sans-serif`;
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(agent.id.slice(-1), centerX, centerY);
+    });
+
+    context.strokeStyle = '#303030';
+    context.lineWidth = 1;
+    for (let x = 0; x <= width; x += 1) {
+        context.beginPath(); context.moveTo(x * cell, 0); context.lineTo(x * cell, canvas.height); context.stroke();
     }
+    for (let y = 0; y <= height; y += 1) {
+        context.beginPath(); context.moveTo(0, y * cell); context.lineTo(canvas.width, y * cell); context.stroke();
+    }
+
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('scenario-name').textContent = state.scenario || 'Warehouse';
+    document.getElementById('grid-dimensions').textContent = `${width}x${height} Grid`;
+    document.getElementById('simulation-state').textContent = state.status || 'ready';
+    document.getElementById('info-scenario-details').innerHTML = `<p>${width}x${height} grid<br>${state.agents.length} robots<br>${state.obstacles.length} obstacles<br>${state.goals.length} goals</p>`;
+    document.getElementById('info-agents-content').innerHTML = state.agents.map(agent => `<p>${agent.id}: (${agent.position.x}, ${agent.position.y}) → (${agent.goal.x}, ${agent.goal.y})<br><small>${agent.status}</small></p>`).join('');
+    updateMetrics(state.metrics || {});
 }
 
-/** --- UI Helper Functions --- */
-
-function showLoading() {
-    const loadDiv = document.getElementById('loading-state');
-    if (loadDiv) loadDiv.style.display = 'block';
-}
-
-function hideLoading() {
-    const loadDiv = document.getElementById('loading-state');
-    if (loadDiv) loadDiv.style.display = 'none';
-}
-
-function disableControls(disabled) {
-    const buttons = document.querySelectorAll('.btn-action:not(:disabled)');
-    buttons.forEach(btn => {
-        if (disabled) {
-            btn.disabled = true;
-        } else {
-            btn.disabled = false;
+function drawCells(context, items, cell, color, label) {
+    items.forEach(item => {
+        const x = item.position.x * cell + cell * 0.12;
+        const y = item.position.y * cell + cell * 0.12;
+        context.fillStyle = color;
+        context.fillRect(x, y, cell * 0.76, cell * 0.76);
+        if (label) {
+            context.fillStyle = '#ffffff';
+            context.font = `bold ${Math.max(11, cell * 0.3)}px sans-serif`;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(label, x + cell * 0.38, y + cell * 0.38);
         }
     });
 }
 
-function showError(message) {
-    const statusDiv = document.getElementById('scenario-status');
-    if (statusDiv) {
-        statusDiv.textContent = `Error: ${message}`;
-        statusDiv.className = 'status-error';
-    }
+function updateMetrics(metrics) {
+    const values = {
+        'total-steps': formatStep(metrics.total_steps || 0),
+        'completed-agents': metrics.completed_agents || 0,
+        'waiting-agents': metrics.waiting_agents || 0,
+        'blocked-agents': metrics.blocked_agents || 0,
+        deadlocks: metrics.deadlock_incidents ?? metrics.deadlocks_detected ?? 0,
+        collisions: metrics.collisions_prevented || 0,
+        'path-length': metrics.total_path_length || 0,
+        recoveries: `${metrics.successful_recoveries || 0}/${metrics.deadlock_recovery_attempts || 0}`,
+    };
+    Object.entries(values).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    });
 }
 
-function showLoading() {
-    const loadDiv = document.getElementById('loading-state');
-    if (loadDiv) loadDiv.style.display = 'block';
-}
-
-/** --- Initialization --- */
-
-function clearWorkspace() {
-    // Clear the canvas
-    const canvas = document.getElementById('warehouseCanvas');
-    if (canvas) {
-        canvas.width = canvas.width;
-    }
-    
-    // Clear details
-    const detailDiv = document.getElementById('scenario-details');
-    if (detailDiv) detailDiv.innerHTML = '';
-    
-    // Clear metrics
-    const metricsDiv = document.getElementById('metrics-panel');
-    if (metricsDiv) {
-        metricsDiv.innerHTML = '<div class="metric-value">0</div><div class="metric-label">Steps</div>';
-    }
+function addEvent(message) {
+    const log = document.getElementById('event-log-body');
+    if (!log) return;
+    const entry = document.createElement('div');
+    entry.textContent = message;
+    log.prepend(entry);
 }

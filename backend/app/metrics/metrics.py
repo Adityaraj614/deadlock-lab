@@ -19,14 +19,18 @@ class SimulationMetrics:
     completed_agents: int = 0
     waiting_agents: int = 0
     blocked_agents: int = 0
+    waiting_steps: int = 0
+    blocked_events: int = 0
     collisions_prevented: int = 0
     deadlocks_detected: int = 0
     deadlock_recovery_attempts: int = 0
     successful_recoveries: int = 0
+    deadlock_incidents: int = 0
     total_path_length: float = 0.0
     average_steps_per_completed: float = 0.0
     simulation_complete: bool = False
     simulation_termination_reason: str | None = None
+    _active_deadlock: frozenset[str] = field(default_factory=frozenset, repr=False)
 
     # ------------------------------------------------------------------
     # Step-by-step collection
@@ -44,6 +48,8 @@ class SimulationMetrics:
         self.blocked_agents = sum(
             1 for a in state.agents if a.status == AgentStatus.BLOCKED
         )
+        self.waiting_steps += self.waiting_agents
+        self.blocked_events += self.blocked_agents
 
         # Completed agents have reached their goal.
         self.completed_agents = sum(
@@ -58,6 +64,10 @@ class SimulationMetrics:
         """Record that a collision was prevented during movement coordination."""
         self.collisions_prevented += 1
 
+    def record_blocked_events(self, count: int) -> None:
+        """Record agents whose movement was blocked in a timestep."""
+        self.blocked_events += max(count, 0)
+
     # ------------------------------------------------------------------
     # Deadlock tracking
     # ------------------------------------------------------------------
@@ -65,6 +75,19 @@ class SimulationMetrics:
     def record_deadlock_detected(self) -> None:
         """Record that a deadlock was detected."""
         self.deadlocks_detected += 1
+
+    def record_deadlock_incident(self, agents: set[str]) -> bool:
+        """Record a new deadlock incident, ignoring persistent repeats."""
+        fingerprint = frozenset(agents)
+        if not fingerprint or fingerprint == self._active_deadlock:
+            return False
+        self._active_deadlock = fingerprint
+        self.deadlock_incidents += 1
+        self.deadlocks_detected += 1
+        return True
+
+    def clear_deadlock_incident(self) -> None:
+        self._active_deadlock = frozenset()
 
     def record_deadlock_recovery_attempt(self) -> None:
         """Record a deadlock recovery attempt."""
@@ -81,9 +104,10 @@ class SimulationMetrics:
     def add_path_length(self, length: float) -> None:
         """Add the path length of a completed agent."""
         self.total_path_length += length
-        n_completed = max(self.completed_agents, 1)
         self.average_steps_per_completed = (
-            self.total_path_length / n_completed
+            self.total_path_length / self.completed_agents
+            if self.completed_agents
+            else 0.0
         )
 
     # ------------------------------------------------------------------
@@ -111,10 +135,13 @@ class SimulationMetrics:
             "completed_agents": self.completed_agents,
             "waiting_agents": self.waiting_agents,
             "blocked_agents": self.blocked_agents,
+            "waiting_steps": self.waiting_steps,
+            "blocked_events": self.blocked_events,
             "collisions_prevented": self.collisions_prevented,
             "deadlocks_detected": self.deadlocks_detected,
             "deadlock_recovery_attempts": self.deadlock_recovery_attempts,
             "successful_recoveries": self.successful_recoveries,
+            "deadlock_incidents": self.deadlock_incidents,
             "total_path_length": self.total_path_length,
             "average_steps_per_completed": self.average_steps_per_completed,
             "simulation_complete": self.simulation_complete,

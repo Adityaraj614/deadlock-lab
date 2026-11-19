@@ -44,42 +44,42 @@
                     <div class="nav-section">
                         <div class="nav-section-title">Overview</div>
                         <div class="nav-items">
-                            <button class="nav-item" onclick="showOverview()">Overview</button>
+                            <button class="nav-item">Overview</button>
                         </div>
                     </div>
                     
                     <div class="nav-section">
                         <div class="nav-section-title">Environment</div>
                         <div class="nav-items">
-                            <button class="nav-item" onclick="showEnvironment()">Environment</button>
+                            <button class="nav-item">Environment</button>
                         </div>
                     </div>
                     
                     <div class="nav-section">
                         <div class="nav-section-title">Simulation</div>
                         <div class="nav-items">
-                            <button class="nav-item" onclick="showSimulation()">Simulation</button>
+                            <button class="nav-item">Simulation</button>
                         </div>
                     </div>
                     
                     <div class="nav-section">
                         <div class="nav-section-title">Algorithms</div>
                         <div class="nav-items">
-                            <button class="nav-item" onclick="showAlgorithms()">Algorithms</button>
+                            <button class="nav-item">Algorithms</button>
                         </div>
                     </div>
                     
                     <div class="nav-section">
                         <div class="nav-section-title">Learning</div>
                         <div class="nav-items">
-                            <button class="nav-item" onclick="showLearning()">Learning</button>
+                            <button class="nav-item">Learning</button>
                         </div>
                     </div>
                     
                     <div class="nav-section">
                         <div class="nav-section-title">Experiments</div>
                         <div class="nav-items">
-                            <button class="nav-item" onclick="showExperiments()">Experiments</button>
+                            <button class="nav-item">Experiments</button>
                         </div>
                     </div>
                 </div>
@@ -88,11 +88,17 @@
                 <div class="scenario-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-default);">
                     <div class="nav-section-title">Scenario</div>
                     <div class="nav-items" style="padding: 0.5rem 1.25rem;">
-                        <select class="scenario-select" id="scenario-select" onchange="handleScenarioChange()">
+                        <select class="scenario-select" id="scenario-select">
                             <option value="" disabled selected>Select scenario</option>
                             <option value="simple_warehouse">Simple Warehouse 10x10</option>
                             <option value="narrow_corridor">Narrow Corridor 5x10</option>
                             <option value="congested_warehouse">Congested Warehouse 12x12</option>
+                        </select>
+                        <select class="scenario-select" id="strategy-select" aria-label="Coordination strategy">
+                            <option value="full">FULL coordination</option>
+                            <option value="priority">Priority</option>
+                            <option value="reservation">Reservation</option>
+                            <option value="deadlock">Deadlock-aware</option>
                         </select>
                     </div>
                 </div>
@@ -131,6 +137,8 @@
                         <button class="btn-action" id="load-scenario" disabled>Load Scenario</button>
                         <button class="btn-action" id="run-simulation" disabled>Run</button>
                         <button class="btn-action" id="step-simulation" disabled>Step</button>
+                        <button class="btn-action" id="pause-simulation" disabled>Pause</button>
+                        <button class="btn-action" id="resume-simulation" disabled>Resume</button>
                         <button class="btn-action" id="reset-simulation">Reset</button>
                     </div>
                     <div class="speed-control">
@@ -170,6 +178,14 @@
                         <div class="metric-value" id="collisions">0</div>
                         <div class="metric-label">Collisions Prevented</div>
                     </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="path-length">0</div>
+                        <div class="metric-label">Path Length</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="recoveries">0</div>
+                        <div class="metric-label">Recoveries</div>
+                    </div>
                 </div>
                 
                 <!----- D.5 Event Log ----->
@@ -194,7 +210,7 @@
                 <!-- Agent Information Section -->
                 <div class="info-section" id="info-agents">
                     <div class="section-title">Agent Information</div>
-                    <div class="content" id="info-agents">
+                    <div class="content" id="info-agents-content">
                         <p>No agents loaded</p>
                     </div>
                 </div>
@@ -218,7 +234,7 @@
                 <!-- Recent Events Section -->
                 <div class="info-section" id="info-events">
                     <div class="section-title">Recent Events</div>
-                    <div class="content" id="info-events">
+                    <div class="content" id="info-events-content">
                         <p>No events</p>
                     </div>
                 </div>
@@ -227,9 +243,7 @@
     </div>
     
     <!-- JavaScript Files -->
-    <script src="../js/api.js"></script>
-    <script src="../js/navigation.js"></script>
-    <script src="../js/warehouse.js"></script>
+    <script type="module" src="../js/warehouse.js?v=3"></script>
     
     <!-- Global CSS -->
     <link rel="stylesheet" href="../css/global.css">

@@ -1,8 +1,3 @@
-from fastapi import FastAPI
+"""Production FastAPI entry point."""
 
-app = FastAPI(title="Deadlock Lab API")
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+from app.api.main import app

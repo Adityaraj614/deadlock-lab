@@ -13,6 +13,9 @@ class SimulationState(BaseModel):
     obstacles: list[Obstacle] = Field(default_factory=list)
     goals: list[Goal] = Field(default_factory=list)
 
+    grid_width: int = Field(default=10, ge=1)
+    grid_height: int = Field(default=10, ge=1)
+
     current_step: int = Field(default=0, ge=0)
     is_running: bool = False
     is_finished: bool = False

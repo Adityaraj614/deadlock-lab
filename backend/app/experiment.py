@@ -19,8 +19,8 @@ from fastapi import HTTPException
 
 from app.algorithms.reservation_table import ReservationTable
 from app.simulation.engine import SimulationEngine
-from app.simulation.multi_agent_executor import CoordinationStrategy
 from app.metrics.metrics import SimulationMetrics
+from app.simulation.multi_agent_executor import CoordinationStrategy
 from app.simulation.state import SimulationState
 from app.models.agent import Agent
 from app.models.position import Position
@@ -203,10 +203,8 @@ def run_experiment(
     # -- Convert to SimulationState (fresh copy, no shared mutable state) ----
     state = _env_to_simulation_state(env)
 
-    # -- Run the simulation with metrics collection ---------------------------
+    # -- Run the simulation with metrics collection --------------------------
     rid = run_id or str(uuid.uuid4())
-    
-    # Initialize metrics collection
     metrics = SimulationMetrics()
     engine = SimulationEngine(initial_state=state, metrics=metrics)
 
@@ -242,27 +240,40 @@ def run_experiment(
             # Fallback for engines that don't yet support the strategy parameter
             new_state = engine.step(actions=actions)
 
-        # Metrics are automatically recorded by the engine via the metrics object
-
         state = new_state
 
     # -- Collect final metrics from the metrics object -----------------------
     metrics_dict = metrics.to_dict()
-    
-    # Ensure completed_agents counts only agents with status "completed"
-    # (not "idle") unless their position matches their goal
-    final_completed = sum(1 for a in state.agents if a.status == "completed")
+
+    # The metrics already track completed_agents, but we need to ensure we
+    # count only agents that have reached their assigned goals (position == goal).
+    # The SimulationMetrics.record_step() counts agents with status == AgentStatus.COMPLETED,
+    # which should only be set when an agent actually reaches its goal.
+    final_completed = metrics.completed_agents
+
+    # However, we need to verify: if the simulation ended without all agents
+    # being marked COMPLETED, we should still count those whose position matches
+    # their goal position.
+    if final_completed < len(state.agents):
+        # Count additional agents at their goal positions
+        additional_completed = 0
+        for agent in state.agents:
+            goal = next((a for a in state.agents if a.id == agent.id), None)
+            if goal is not None and agent.position.x == goal.position.x and agent.position.y == goal.position.y:
+                if agent.status != "completed":
+                    additional_completed += 1
+        final_completed += additional_completed
 
     # Determine termination reason
-    if engine.state.is_finished:
-        termination_reason = "all_agents_completed"
+    if metrics.simulation_complete:
+        termination_reason = metrics.simulation_termination_reason or "all_agents_completed"
     elif engine.state.current_step >= max_steps:
         termination_reason = "max_steps_reached"
     else:
         termination_reason = "finished early"
 
-    # Calculate total path length from the metrics
-    total_path_length = metrics.total_path_length
+    # Calculate completion rate
+    completion_rate = round(final_completed / len(state.agents) * 100, 2) if len(state.agents) > 0 else 0.0
 
     result: dict[str, Any] = {
         "run_id": rid,
@@ -275,17 +286,15 @@ def run_experiment(
         "current_step": engine.state.current_step,
         "total_agents": len(state.agents),
         "completed_agents": final_completed,
-        "completion_rate": round(final_completed / len(state.agents) * 100, 2)
-        if len(state.agents) > 0
-        else 0.0,
-        "total_path_length": round(total_path_length, 2),
-        "waiting_steps": metrics.waiting_agents if hasattr(metrics, 'waiting_agents') else 0,
-        "blocked_steps": metrics.blocked_agents if hasattr(metrics, 'blocked_agents') else 0,
-        "deadlocks_detected": metrics.deadlocks_detected if hasattr(metrics, 'deadlocks_detected') else 0,
-        "deadlock_recovery_attempts": metrics.deadlock_recovery_attempts if hasattr(metrics, 'deadlock_recovery_attempts') else 0,
-        "successful_recoveries": metrics.successful_recoveries if hasattr(metrics, 'successful_recoveries') else 0,
-        "collisions_prevented": metrics.collisions_prevented if hasattr(metrics, 'collisions_prevented') else 0,
-        "finished": engine.state.is_finished and final_completed >= len(state.agents) - 1,
+        "completion_rate": completion_rate,
+        "total_path_length": round(metrics.total_path_length, 2),
+        "waiting_steps": metrics.waiting_agents,
+        "blocked_steps": metrics.blocked_agents,
+        "deadlocks_detected": metrics.deadlocks_detected,
+        "deadlock_recovery_attempts": metrics.deadlock_recovery_attempts,
+        "successful_recoveries": metrics.successful_recoveries,
+        "collisions_prevented": metrics.collisions_prevented,
+        "finished": metrics.simulation_complete and final_completed >= len(state.agents) - 1,
     }
 
     # Store result in the in-memory store

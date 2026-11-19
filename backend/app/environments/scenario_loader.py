@@ -1,5 +1,6 @@
 from __future__ import annotations
 import yaml
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.models.agent import Agent
@@ -23,9 +24,8 @@ def load_scenario(name: str, base_dir: str | None = None) -> WarehouseGridEnviro
     default path).
     """
 
-    config_path = (
-        f"{base_dir}/configs/warehouse_scenarios.yaml" if base_dir else "configs/warehouse_scenarios.yaml"
-    )
+    project_root = Path(base_dir) if base_dir else Path(__file__).resolve().parents[3]
+    config_path = project_root / "configs" / "warehouse_scenarios.yaml"
     config = load_yaml_config(config_path)
 
     scenario: Optional[dict[str, Any]] = config.get(name) if config else None

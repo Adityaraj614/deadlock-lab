@@ -5,7 +5,7 @@
  * Handles loading states, error handling, and connection status.
  */
 
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = new URLSearchParams(window.location.search).get('api') || 'http://127.0.0.1:8000';
 let connectionStatus = 'disconnected';
 let lastError = null;
 
@@ -13,6 +13,7 @@ let lastError = null;
  * Check if the backend is reachable.
  */
 export async function checkConnection() {
+    let errorMessage = 'Unknown error';
     try {
         const response = await fetch(`${API_BASE}/health`, {
             method: 'GET',
@@ -26,11 +27,11 @@ export async function checkConnection() {
             return true;
         }
     } catch (error) {
-        // Ignore specific errors, just check status
+        errorMessage = error instanceof Error ? error.message : errorMessage;
     }
     
     connectionStatus = 'disconnected';
-    lastError = error instanceof Error ? error.message : 'Unknown error';
+    lastError = errorMessage;
     return false;
 }
 
@@ -53,14 +54,14 @@ export function getLastError() {
  */
 async function apiFetch(endpoint, options = {}) {
     const url = `${API_BASE}${endpoint}`;
-    const defaults = {
-        headers: { 'Content-Type': 'application/json' },
-        ...options.headers,
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
     };
     
     const response = await fetch(url, {
         ...options,
-        headers: defaults,
+        headers,
         cache: 'no-cache',
     });
     
@@ -109,28 +110,31 @@ export function getScenario(name) {
  * Load a warehouse scenario.
  * Returns a SimulationState with agents, obstacles, goals, and grid dimensions.
  */
-export function loadScenario(name) {
-    return apiFetch(`/api/scenario/load/${name}`);
+export function loadScenario(name, strategy = 'full', maxSteps = 100) {
+    return apiFetch(`/api/scenario/load/${name}`, {
+        method: 'POST',
+        body: JSON.stringify({ strategy, max_steps: maxSteps }),
+    });
 }
 
 /**
  * Advance the simulation by one timestep.
  * actions should be a list of Action objects, one per agent.
  */
-export function simulateStep(actions) {
+export function simulateStep(actions = [], strategy = 'full') {
     return apiFetch('/api/simulate/step', {
         method: 'POST',
-        body: JSON.stringify({ actions }),
+        body: JSON.stringify({ actions, strategy }),
     });
 }
 
 /**
  * Run the simulation until the step limit is reached.
  */
-export function simulateRun(maxSteps = 100) {
+export function simulateRun(maxSteps = 100, strategy = 'full') {
     return apiFetch('/api/simulate/run', {
         method: 'POST',
-        body: JSON.stringify({ max_steps: maxSteps }),
+        body: JSON.stringify({ max_steps: maxSteps, strategy }),
     });
 }
 
@@ -138,7 +142,15 @@ export function simulateRun(maxSteps = 100) {
  * Reset the simulation to its initial state.
  */
 export function simulateReset() {
-    return apiFetch('/api/simulate/reset');
+    return apiFetch('/api/simulate/reset', { method: 'POST' });
+}
+
+export function simulatePause() {
+    return apiFetch('/api/simulate/pause', { method: 'POST' });
+}
+
+export function simulateResume() {
+    return apiFetch('/api/simulate/resume', { method: 'POST' });
 }
 
 /** --- Metrics Endpoint --- */

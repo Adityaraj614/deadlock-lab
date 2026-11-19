@@ -6,6 +6,7 @@ sys.path.insert(0, r'C:\Users\kumar\OneDrive\Desktop\NVIDIA\deadlock-lab\backend
 from app.algorithms.reservation_table import ReservationTable
 from app.simulation.multi_agent_executor import MultiAgentExecutor, CoordinationStrategy
 from app.simulation.state import SimulationState
+from app.simulation.engine import SimulationEngine
 from app.models.agent import Agent
 from app.models.position import Position
 from app.models.action import Action, ActionType
@@ -133,7 +134,7 @@ def test_no_unsafe_collisions():
     # Scenario B: Same direction
     agents_b = [
         make_agent("a1", Position(x=0, y=0), Position(x=3, y=0)),
-        make_agent("a2", Position(x=0, y=0), Position(x=3, y=0)),
+            make_agent("a2", Position(x=1, y=0), Position(x=3, y=0)),
     ]
     state_b = SimulationState(grid_width=grid_width, grid_height=grid_height, agents=agents_b, obstacles=[])
     actions_b = [

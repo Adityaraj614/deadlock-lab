@@ -1,5 +1,5 @@
 
-from app.models.agent import Agent
+from app.models.agent import Agent, AgentStatus
 from app.models.position import Position
 from app.simulation.state import SimulationState
 
@@ -116,7 +116,7 @@ class DeadlockResolver:
                 return False
 
         agent.position = destination
-        agent.status = "waiting"
+        agent.status = AgentStatus.WAITING
 
         return True
 
