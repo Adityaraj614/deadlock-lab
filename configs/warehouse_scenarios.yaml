@@ -1,0 +1,120 @@
+simple_warehouse:
+  grid_width: 10
+  grid_height: 10
+  obstacles:
+    - id: "obstacle_1"
+      position: {x: 4, y: 4}
+      is_dynamic: false
+    - id: "obstacle_2"
+      position: {x: 5, y: 5}
+      is_dynamic: false
+  agents:
+    - id: "robot_1"
+      position: {x: 1, y: 1}
+      goal: {x: 8, y: 8}
+      priority: 1
+      speed: 1.0
+    - id: "robot_2"
+      position: {x: 1, y: 8}
+      goal: {x: 8, y: 1}
+      priority: 1
+      speed: 1.0
+  goals:
+    - id: "goal_1"
+      position: {x: 8, y: 8}
+      assigned_agent_id: "robot_1"
+    - id: "goal_2"
+      position: {x: 8, y: 1}
+      assigned_agent_id: "robot_2"
+narrow_corridor:
+  grid_width: 5
+  grid_height: 10
+  obstacles:
+    - id: "wall_1"
+      position: {x: 2, y: 0}
+      is_dynamic: false
+    - id: "wall_2"
+      position: {x: 2, y: 9}
+      is_dynamic: false
+    - id: "wall_3"
+      position: {x: 3, y: 0}
+      is_dynamic: false
+    - id: "wall_4"
+      position: {x: 3, y: 9}
+      is_dynamic: false
+  agents:
+    - id: "robot_1"
+      position: {x: 0, y: 1}
+      goal: {x: 4, y: 1}
+      priority: 1
+      speed: 1.0
+    - id: "robot_2"
+      position: {x: 0, y: 8}
+      goal: {x: 4, y: 8}
+      priority: 1
+      speed: 1.0
+    - id: "robot_3"
+      position: {x: 1, y: 4}
+      goal: {x: 3, y: 4}
+      priority: 2
+      speed: 1.0
+  goals:
+    - id: "goal_1"
+      position: {x: 4, y: 1}
+      assigned_agent_id: "robot_1"
+    - id: "goal_2"
+      position: {x: 4, y: 8}
+      assigned_agent_id: "robot_2"
+    - id: "goal_3"
+      position: {x: 3, y: 4}
+      assigned_agent_id: "robot_3"
+congested_warehouse:
+  grid_width: 12
+  grid_height: 12
+  obstacles:
+    - id: "pillar_1"
+      position: {x: 5, y: 5}
+      is_dynamic: false
+    - id: "pillar_2"
+      position: {x: 6, y: 5}
+      is_dynamic: false
+    - id: "pillar_3"
+      position: {x: 5, y: 6}
+      is_dynamic: false
+    - id: "pillar_4"
+      position: {x: 7, y: 7}
+      is_dynamic: false
+  agents:
+    - id: "robot_A"
+      position: {x: 1, y: 1}
+      goal: {x: 11, y: 11}
+      priority: 1
+      speed: 1.0
+    - id: "robot_B"
+      position: {x: 1, y: 11}
+      goal: {x: 11, y: 1}
+      priority: 1
+      speed: 1.0
+    - id: "robot_C"
+      position: {x: 4, y: 4}
+      goal: {x: 8, y: 8}
+      priority: 2
+      speed: 1.5
+    - id: "robot_D"
+      position: {x: 8, y: 4}
+      goal: {x: 4, y: 8}
+      priority: 3
+      speed: 1.0
+  goals:
+    - id: "goal_A"
+      position: {x: 11, y: 11}
+      assigned_agent_id: "robot_A"
+    - id: "goal_B"
+      position: {x: 11, y: 1}
+      assigned_agent_id: "robot_B"
+    - id: "goal_C"
+      position: {x: 8, y: 8}
+      assigned_agent_id: "robot_C"
+    - id: "goal_D"
+      position: {x: 4, y: 8}
+      assigned_agent_id: "robot_D"
