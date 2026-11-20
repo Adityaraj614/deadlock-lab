@@ -153,6 +153,21 @@ export function simulateResume() {
     return apiFetch('/api/simulate/resume', { method: 'POST' });
 }
 
+/** --- Experiment Endpoints --- */
+
+/** Run all four coordination strategies against one scenario. */
+export function runExperimentComparison(scenarioName, maxSteps = 100) {
+    return apiFetch('/api/experiment/compare', {
+        method: 'POST',
+        body: JSON.stringify({ scenario_name: scenarioName, max_steps: maxSteps }),
+    });
+}
+
+/** Load session-level experiment history. */
+export function listExperimentResults() {
+    return apiFetch('/api/experiment/results');
+}
+
 /** --- Metrics Endpoint --- */
 
 /**

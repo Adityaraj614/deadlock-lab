@@ -30,70 +30,39 @@
         <!----- B. Main Layout (three-column: sidebar | central + right panel) ----->
         <main class="main-layout">
             
-            <!----- C. Left Sidebar (260px, independent vertical scroll) ----->
+            <!----- C. Left Sidebar (compact, independently scrollable) ----->
             <aside class="grid-area" role="navigation">
-                <div class="sidebar-header">
-                    <span class="sidebar-caption">Warehouse Lab</span>
-                    <button class="btn btn-link back-home" onclick="navigateBackHome()" aria-label="Back to Home">
-                        ← Home
-                    </button>
-                </div>
-                
-                <!-- Navigation Sections -->
+                <!-- Primary navigation -->
                 <div class="nav-sections">
                     <div class="nav-section">
-                        <div class="nav-section-title">Overview</div>
+                        <div class="nav-section-title">Workspace</div>
                         <div class="nav-items">
-                            <button class="nav-item">Overview</button>
+                            <button class="nav-item active" data-view="simulation">Simulation</button>
+                            <button class="nav-item" data-view="experiments">Experiments</button>
                         </div>
                     </div>
-                    
+
                     <div class="nav-section">
-                        <div class="nav-section-title">Environment</div>
-                        <div class="nav-items">
-                            <button class="nav-item">Environment</button>
-                        </div>
-                    </div>
-                    
-                    <div class="nav-section">
-                        <div class="nav-section-title">Simulation</div>
-                        <div class="nav-items">
-                            <button class="nav-item">Simulation</button>
-                        </div>
-                    </div>
-                    
-                    <div class="nav-section">
-                        <div class="nav-section-title">Algorithms</div>
+                        <div class="nav-section-title">Tools</div>
                         <div class="nav-items">
                             <button class="nav-item">Algorithms</button>
-                        </div>
-                    </div>
-                    
-                    <div class="nav-section">
-                        <div class="nav-section-title">Learning</div>
-                        <div class="nav-items">
                             <button class="nav-item">Learning</button>
-                        </div>
-                    </div>
-                    
-                    <div class="nav-section">
-                        <div class="nav-section-title">Experiments</div>
-                        <div class="nav-items">
-                            <button class="nav-item">Experiments</button>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Scenario Selection Section -->
-                <div class="scenario-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-default);">
+                <div class="scenario-section">
                     <div class="nav-section-title">Scenario</div>
-                    <div class="nav-items" style="padding: 0.5rem 1.25rem;">
+                    <div class="scenario-controls">
+                        <label for="scenario-select">Warehouse layout</label>
                         <select class="scenario-select" id="scenario-select">
                             <option value="" disabled selected>Select scenario</option>
                             <option value="simple_warehouse">Simple Warehouse 10x10</option>
                             <option value="narrow_corridor">Narrow Corridor 5x10</option>
                             <option value="congested_warehouse">Congested Warehouse 12x12</option>
                         </select>
+                        <label for="strategy-select">Coordination</label>
                         <select class="scenario-select" id="strategy-select" aria-label="Coordination strategy">
                             <option value="full">FULL coordination</option>
                             <option value="priority">Priority</option>
@@ -106,6 +75,7 @@
             
             <!----- D. Main Content Area ----->
             <main class="main-content" role="main">
+                <div id="simulation-view">
                 <!----- D.1 Title and Scenario Info ----->
                 <div class="workspace-header">
                     <h2>Warehouse Simulation</h2>
@@ -195,6 +165,71 @@
                         <span>Select a scenario to begin simulation</span>
                     </div>
                 </div>
+                </div>
+
+                <section id="experiments-view" class="experiments-view hidden" aria-labelledby="experiments-title">
+                    <div class="workspace-header">
+                        <h2 id="experiments-title">Strategy Experiments</h2>
+                        <div class="scenario-info">
+                            <span class="scenario-name">Compare coordination strategies</span>
+                            <span class="grid-dimensions">Live backend results</span>
+                        </div>
+                    </div>
+
+                    <div class="experiment-config">
+                        <div class="experiment-field">
+                            <label for="experiment-scenario">Scenario</label>
+                            <select id="experiment-scenario" class="scenario-select">
+                                <option value="simple_warehouse">Simple Warehouse</option>
+                                <option value="narrow_corridor">Narrow Corridor</option>
+                                <option value="congested_warehouse">Congested Warehouse</option>
+                            </select>
+                        </div>
+                        <div class="experiment-strategies" aria-label="Compared strategies">
+                            <span class="experiment-field-label">Strategies</span>
+                            <div class="strategy-chips">
+                                <span class="strategy-chip">FULL</span>
+                                <span class="strategy-chip">PRIORITY</span>
+                                <span class="strategy-chip">RESERVATION</span>
+                                <span class="strategy-chip">DEADLOCK</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary experiment-run" id="run-comparison">Run Comparison</button>
+                    </div>
+
+                    <div class="experiment-progress" id="experiment-progress" role="status" aria-live="polite">
+                        <div class="progress-copy" id="experiment-progress-copy">Ready to compare all four strategies.</div>
+                        <div class="progress-track"><div class="progress-bar" id="experiment-progress-bar"></div></div>
+                    </div>
+
+                    <div class="experiment-summary" id="experiment-summary">
+                        <div class="metric-card"><div class="metric-value">—</div><div class="metric-label">Run a comparison</div></div>
+                    </div>
+
+                    <div class="experiment-results-grid">
+                        <section class="experiment-panel">
+                            <div class="section-title">Metric Comparison</div>
+                            <div class="table-scroll">
+                                <table class="experiment-table" id="experiment-table">
+                                    <thead><tr><th>Metric</th><th>FULL</th><th>PRIORITY</th><th>RESERVATION</th><th>DEADLOCK</th></tr></thead>
+                                    <tbody><tr><td colspan="5" class="table-empty">Run a comparison to load backend metrics.</td></tr></tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="experiment-panel">
+                            <div class="section-title">Comparison Charts</div>
+                            <div id="experiment-charts" class="experiment-charts">
+                                <div class="chart-empty">Charts appear after a comparison.</div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="experiment-panel experiment-history">
+                        <div class="section-title">Recent Experiment History</div>
+                        <div id="experiment-history-list" class="history-list"><span class="table-empty">No experiment runs yet.</span></div>
+                    </section>
+                </section>
             </main>
             
             <!----- E. Right Information Panel (~290px) ----->

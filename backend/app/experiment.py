@@ -19,6 +19,7 @@ from fastapi import HTTPException
 
 from app.algorithms.reservation_table import ReservationTable
 from app.simulation.engine import SimulationEngine
+from app.simulation.session import SimulationSession
 from app.metrics.metrics import SimulationMetrics
 from app.simulation.multi_agent_executor import CoordinationStrategy
 from app.simulation.state import SimulationState
@@ -191,110 +192,39 @@ def run_experiment(
         A dictionary containing the experiment result record with all recorded
         metrics and metadata.
     """
-    # -- Load scenario configuration -----------------------------------------
-    scenario_cfg = _load_scenario_config(scenario_name)
-
-    grid_width = scenario_cfg["grid_width"]
-    grid_height = scenario_cfg["grid_height"]
-
-    # -- Load the scenario via the existing loader ----------------------------
-    env = _load_scenario_func(scenario_name)  # returns WarehouseGridEnvironment
-
-    # -- Convert to SimulationState (fresh copy, no shared mutable state) ----
-    state = _env_to_simulation_state(env)
-
-    # -- Run the simulation with metrics collection --------------------------
     rid = run_id or str(uuid.uuid4())
-    metrics = SimulationMetrics()
-    engine = SimulationEngine(initial_state=state, metrics=metrics)
+    session = SimulationSession()
+    session.load(scenario_name, strategy=strategy, max_steps=max_steps)
+    session.run()
 
-    while engine.state.current_step < max_steps and not engine.state.is_finished:
-        # ---- Generate actions using A* pathfinding for each agent -------------
-        actions: list[Action] = []
-        # Build a mapping from agent_id -> agent object for quick lookup
-        agent_map: dict[str, Agent] = {a.id: a for a in state.agents}
-
-        for agent in state.agents:
-            # Run A* from current position to goal, using current obstacles
-            path_result: PathResult = a_star(
-                start=agent.position,
-                goal=agent.goal,
-                grid_width=grid_width,
-                grid_height=grid_height,
-                obstacles=list(state.obstacles),
-            )
-            if path_result.success and path_result.path:
-                action = _next_action_from_path(agent, path_result.path)
-            else:
-                # No valid path -> wait
-                action = Action(agent_id=agent.id, action_type=ActionType.WAIT)
-            actions.append(action)
-
-        # ---- Execute one timestep with the selected coordination strategy -----
-        try:
-            new_state = engine.step(
-                actions=actions,
-                strategy=strategy,
-            )
-        except TypeError:
-            # Fallback for engines that don't yet support the strategy parameter
-            new_state = engine.step(actions=actions)
-
-        state = new_state
-
-    # -- Collect final metrics from the metrics object -----------------------
-    metrics_dict = metrics.to_dict()
-
-    # The metrics already track completed_agents, but we need to ensure we
-    # count only agents that have reached their assigned goals (position == goal).
-    # The SimulationMetrics.record_step() counts agents with status == AgentStatus.COMPLETED,
-    # which should only be set when an agent actually reaches its goal.
-    final_completed = metrics.completed_agents
-
-    # However, we need to verify: if the simulation ended without all agents
-    # being marked COMPLETED, we should still count those whose position matches
-    # their goal position.
-    if final_completed < len(state.agents):
-        # Count additional agents at their goal positions
-        additional_completed = 0
-        for agent in state.agents:
-            goal = next((a for a in state.agents if a.id == agent.id), None)
-            if goal is not None and agent.position.x == goal.position.x and agent.position.y == goal.position.y:
-                if agent.status != "completed":
-                    additional_completed += 1
-        final_completed += additional_completed
-
-    # Determine termination reason
-    if metrics.simulation_complete:
-        termination_reason = metrics.simulation_termination_reason or "all_agents_completed"
-    elif engine.state.current_step >= max_steps:
-        termination_reason = "max_steps_reached"
-    else:
-        termination_reason = "finished early"
-
-    # Calculate completion rate
-    completion_rate = round(final_completed / len(state.agents) * 100, 2) if len(state.agents) > 0 else 0.0
+    state = session.state
+    metrics = session.metrics
+    final_completed = sum(agent.position == agent.goal for agent in state.agents)
+    completion_rate = round(
+        final_completed / len(state.agents) * 100, 2
+    ) if state.agents else 0.0
+    termination_reason = metrics.simulation_termination_reason or "finished early"
 
     result: dict[str, Any] = {
         "run_id": rid,
         "scenario": scenario_name,
         "strategy": strategy.value,
-        "grid_width": grid_width,
-        "grid_height": grid_height,
+        "grid_width": state.grid_width,
+        "grid_height": state.grid_height,
         "max_steps": max_steps,
         "termination_reason": termination_reason,
-        "current_step": engine.state.current_step,
+        "current_step": state.current_step,
         "total_agents": len(state.agents),
         "completed_agents": final_completed,
         "completion_rate": completion_rate,
         "total_path_length": round(metrics.total_path_length, 2),
-        "waiting_steps": metrics.waiting_agents,
-        "blocked_steps": metrics.blocked_agents,
+        "waiting_steps": metrics.waiting_steps,
+        "blocked_steps": metrics.blocked_events,
         "deadlocks_detected": metrics.deadlocks_detected,
         "deadlock_recovery_attempts": metrics.deadlock_recovery_attempts,
         "successful_recoveries": metrics.successful_recoveries,
         "collisions_prevented": metrics.collisions_prevented,
-        "finished": metrics.simulation_complete and final_completed >= len(state.agents) - 1,
+        "finished": metrics.simulation_complete and final_completed == len(state.agents),
     }
 
     # Store result in the in-memory store
@@ -403,7 +333,7 @@ def add_experiment_routes(app: Any) -> None:
         return result
 
     @app.post("/api/experiment/compare", tags=["experiment"])
-    def run_comparative_experiment(
+    def run_comparative_experiment_endpoint(
         scenario_name: str = Body(..., embed=True),
         max_steps: int = Body(100, embed=True),
         run_id_prefix: str = Body("compare_", embed=True),

@@ -5,20 +5,24 @@
 
 /* --- Root Variables --- */
 :root {
-    --bg-primary: #0B0B0B;
-    --bg-workspace: #111111;
-    --bg-sidebar: #151515;
-    --bg-panel: #151515;
-    --bg-canvas: #090909;
-    --bg-card: #202020;
-    --bg-accent: #383838;
-    --gold: #C6A15B;
-    --gold-light: #D4B475;
-    --text-primary: #FFFFFF;
-    --text-secondary: #A0A0A0;
+    --bg-primary: #101010;
+    --bg-workspace: #101010;
+    --bg-sidebar: #141414;
+    --bg-panel: #141414;
+    --bg-canvas: #0D0D0D;
+    --bg-card: #1B1B1B;
+    --bg-accent: #272727;
+    --gold: #D4AD62;
+    --gold-light: #E1C27D;
+    --text-primary: #EEEEEE;
+    --text-secondary: #999999;
     --border-default: #303030;
-    --border-light: #505050;
+    --border-light: #454545;
     --status-active: #10B981;
+}
+
+.hidden {
+    display: none !important;
 }
 
 /* --- Page Base --- */
@@ -92,11 +96,11 @@ body {
 
 /* --- Left Sidebar (260px, independent scroll) --- */
 .grid-area {
-    width: 260px;
+    width: 232px;
     flex-shrink: 0;
     background-color: var(--bg-sidebar);
     border-right: 1px solid var(--border-default);
-    padding-bottom: 1rem;
+    padding: 0.9rem 0.6rem 1rem;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--border-light) var(--bg-sidebar);
@@ -125,7 +129,7 @@ body {
 }
 
 .nav-section {
-    border-bottom: 1px solid var(--border-default);
+    padding-bottom: 0.65rem;
 }
 
 .nav-section:last-child {
@@ -137,22 +141,22 @@ body {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    padding: 0.75rem 1rem 0.25rem 1rem;
+    padding: 0.55rem 0.65rem 0.3rem;
     font-weight: 500;
     margin: 0;
 }
 
 .nav-items {
-    padding: 0 1rem;
+    padding: 0 0.25rem;
 }
 
 .nav-item {
     width: 100%;
-    padding: 0.5rem 1rem;
-    margin: 0.25rem 0;
+    padding: 0.48rem 0.7rem;
+    margin: 0.1rem 0;
     border-radius: 4px;
     color: var(--text-secondary);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -166,17 +170,34 @@ body {
 
 .nav-item.active {
     color: var(--gold);
-    border-left: 3px solid var(--gold);
-    background-color: rgba(198, 161, 91, 0.1);
+    border-left: 2px solid var(--gold);
+    background-color: rgba(212, 173, 98, 0.08);
+    font-weight: 600;
 }
 
 /* --- Scenario Section --- */
 .scenario-section {
-    padding: 0.75rem 1rem 0.5rem 1rem;
+    margin-top: auto;
+    padding: 0.85rem 0.25rem 0;
+    border-top: 1px solid var(--border-default);
 }
 
 .scenario-section .nav-section-title {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.55rem;
+}
+
+.scenario-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0 0.25rem;
+}
+
+.scenario-controls label {
+    color: var(--text-secondary);
+    font-size: 0.64rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 /* --- Main Content Area --- */
@@ -185,7 +206,7 @@ body {
     background-color: var(--bg-workspace);
     min-height: 0;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 1rem 1.1rem;
     box-sizing: border-box;
     position: relative;
 }
@@ -226,6 +247,40 @@ body {
     flex-wrap: wrap;
     gap: 1rem;
     align-items: center;
+}
+
+.scenario-select,
+.experiment-field .scenario-select {
+    appearance: none;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    padding: 0 2rem 0 0.7rem;
+    color: var(--text-primary);
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    font: inherit;
+    font-size: 0.75rem;
+    background-image: linear-gradient(45deg, transparent 50%, var(--gold) 50%), linear-gradient(135deg, var(--gold) 50%, transparent 50%);
+    background-position: calc(100% - 13px) 14px, calc(100% - 9px) 14px;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+}
+
+.scenario-select:hover {
+    border-color: var(--border-light);
+}
+
+.scenario-select:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(212, 173, 98, 0.12);
+}
+
+.scenario-select option {
+    color: var(--text-primary);
+    background: var(--bg-card);
 }
 
 .scenario-name {
@@ -396,6 +451,292 @@ body {
     letter-spacing: 1px;
 }
 
+/* --- Experiments Dashboard --- */
+.experiments-view {
+    width: 100%;
+    max-width: none;
+    margin: 0 auto;
+}
+
+.experiment-config,
+.experiment-panel,
+.experiment-progress {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    padding: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.experiment-config {
+    display: flex;
+    align-items: end;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.experiment-field,
+.experiment-strategies {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.experiment-field label,
+.experiment-field-label {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.experiment-field .scenario-select {
+    min-width: 210px;
+}
+
+.strategy-chips {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.strategy-chip {
+    color: var(--gold-light);
+    border: 1px solid rgba(198, 161, 91, 0.45);
+    border-radius: 999px;
+    padding: 0.42rem 0.6rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+}
+
+.experiment-run {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.experiment-run:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.experiment-progress {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+}
+
+.progress-copy.progress-error {
+    color: #f87171;
+}
+
+.progress-track {
+    height: 4px;
+    margin-top: 0.55rem;
+    overflow: hidden;
+    background: var(--bg-primary);
+    border-radius: 999px;
+}
+
+.progress-bar {
+    width: 0;
+    height: 100%;
+    background: var(--gold);
+}
+
+.progress-bar.is-running {
+    width: 42%;
+    animation: experiment-progress 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes experiment-progress {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(240%); }
+}
+
+.experiment-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.experiment-metric-card {
+    min-height: 70px;
+}
+
+.metric-caption {
+    color: var(--gold-light);
+    font-size: 0.62rem;
+    margin-top: 0.2rem;
+    text-transform: uppercase;
+}
+
+.metric-status {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.59rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-top: 0.15rem;
+}
+
+.experiment-results-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+    gap: 0.75rem;
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.experiment-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.76rem;
+}
+
+.experiment-table th,
+.experiment-table td {
+    padding: 0.58rem 0.45rem;
+    border-bottom: 1px solid var(--border-default);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.experiment-table th:not(:first-child),
+.experiment-table td:not(:first-child) {
+    width: 15%;
+}
+
+.experiment-table th:first-child,
+.experiment-table td:first-child {
+    text-align: left;
+}
+
+.experiment-table thead th {
+    color: var(--gold-light);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+}
+
+.experiment-table tbody th {
+    width: 40%;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.experiment-table tbody th span,
+.experiment-table tbody th small {
+    display: block;
+}
+
+.metric-status {
+    color: var(--gold-light);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-top: 0.15rem;
+}
+
+.best-value {
+    color: var(--gold-light);
+    font-weight: 700;
+    background: rgba(198, 161, 91, 0.1);
+}
+
+.table-empty,
+.chart-empty {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.experiment-charts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.mini-chart-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.mini-chart-title small {
+    color: var(--gold-light);
+    font-size: 0.6rem;
+    font-weight: 700;
+}
+
+.chart-row {
+    display: grid;
+    grid-template-columns: 88px minmax(100px, 1fr) 34px;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.25rem 0;
+    color: var(--text-secondary);
+    font-size: 0.66rem;
+}
+
+.strategy-label {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.chart-row strong {
+    color: var(--text-primary);
+    text-align: right;
+    font-size: 0.68rem;
+}
+
+.chart-track {
+    height: 7px;
+    overflow: hidden;
+    background: var(--bg-primary);
+    border-radius: 999px;
+}
+
+.chart-bar {
+    height: 100%;
+    background: #64748b;
+    border-radius: 999px;
+}
+
+.chart-bar.strategy-full { background: #d4b475; }
+.chart-bar.strategy-priority { background: #60a5fa; }
+.chart-bar.strategy-reservation { background: #34d399; }
+.chart-bar.strategy-deadlock { background: #c084fc; }
+
+.chart-bar.best-bar {
+    box-shadow: 0 0 0 1px var(--text-primary), 0 0 8px rgba(212, 180, 117, 0.45);
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.history-row {
+    display: grid;
+    grid-template-columns: 1.5fr 0.8fr 1fr 0.8fr;
+    gap: 0.5rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.history-row span:nth-child(2) {
+    color: var(--gold-light);
+}
+
 /* --- Event Log Section --- */
 .event-log-section {
     background-color: var(--bg-card);
@@ -541,5 +882,28 @@ body {
         border-left: none;
         border-top: 1px solid var(--border-default);
         order: 1;
+    }
+
+    .experiment-results-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .experiment-summary {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .experiment-summary {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .experiment-run {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .history-row {
+        grid-template-columns: 1fr 0.8fr;
     }
 }
