@@ -30,44 +30,44 @@ narrow_corridor:
   grid_width: 5
   grid_height: 10
   obstacles:
-    - id: "wall_1"
-      position: {x: 2, y: 0}
-      is_dynamic: false
-    - id: "wall_2"
-      position: {x: 2, y: 9}
-      is_dynamic: false
-    - id: "wall_3"
-      position: {x: 3, y: 0}
-      is_dynamic: false
-    - id: "wall_4"
-      position: {x: 3, y: 9}
-      is_dynamic: false
+    # A one-cell vertical lane with a single two-cell passing bay at y=5.
+    # The outer grid boundary supplies the remaining corridor walls.
+    - {id: "wall_1", position: {x: 1, y: 0}, is_dynamic: false}
+    - {id: "wall_2", position: {x: 3, y: 0}, is_dynamic: false}
+    - {id: "wall_3", position: {x: 1, y: 1}, is_dynamic: false}
+    - {id: "wall_4", position: {x: 3, y: 1}, is_dynamic: false}
+    - {id: "wall_5", position: {x: 1, y: 2}, is_dynamic: false}
+    - {id: "wall_6", position: {x: 3, y: 2}, is_dynamic: false}
+    - {id: "wall_7", position: {x: 1, y: 3}, is_dynamic: false}
+    - {id: "wall_8", position: {x: 3, y: 3}, is_dynamic: false}
+    - {id: "wall_9", position: {x: 1, y: 4}, is_dynamic: false}
+    - {id: "wall_10", position: {x: 3, y: 4}, is_dynamic: false}
+    - {id: "wall_11", position: {x: 1, y: 6}, is_dynamic: false}
+    - {id: "wall_12", position: {x: 3, y: 6}, is_dynamic: false}
+    - {id: "wall_13", position: {x: 1, y: 7}, is_dynamic: false}
+    - {id: "wall_14", position: {x: 3, y: 7}, is_dynamic: false}
+    - {id: "wall_15", position: {x: 1, y: 8}, is_dynamic: false}
+    - {id: "wall_16", position: {x: 3, y: 8}, is_dynamic: false}
+    - {id: "wall_17", position: {x: 1, y: 9}, is_dynamic: false}
+    - {id: "wall_18", position: {x: 3, y: 9}, is_dynamic: false}
   agents:
     - id: "robot_1"
-      position: {x: 0, y: 1}
-      goal: {x: 4, y: 1}
-      priority: 1
+      position: {x: 2, y: 1}
+      goal: {x: 2, y: 8}
+      priority: 2
       speed: 1.0
     - id: "robot_2"
-      position: {x: 0, y: 8}
-      goal: {x: 4, y: 8}
+      position: {x: 2, y: 7}
+      goal: {x: 2, y: 2}
       priority: 1
-      speed: 1.0
-    - id: "robot_3"
-      position: {x: 1, y: 4}
-      goal: {x: 3, y: 4}
-      priority: 2
       speed: 1.0
   goals:
     - id: "goal_1"
-      position: {x: 4, y: 1}
+      position: {x: 2, y: 8}
       assigned_agent_id: "robot_1"
     - id: "goal_2"
-      position: {x: 4, y: 8}
+      position: {x: 2, y: 2}
       assigned_agent_id: "robot_2"
-    - id: "goal_3"
-      position: {x: 3, y: 4}
-      assigned_agent_id: "robot_3"
 congested_warehouse:
   grid_width: 12
   grid_height: 12

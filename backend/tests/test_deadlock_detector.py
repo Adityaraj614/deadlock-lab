@@ -172,9 +172,8 @@ def test_build_waiting_dependencies():
         state, proposals
     )
 
-    assert dependencies == {
-        "robot_A": {"robot_B"}
-    }
+    # A stationary occupant is a collision constraint, not a wait-for cycle.
+    assert dependencies == {}
 
 
 def test_build_three_agent_circular_dependencies():

@@ -79,9 +79,16 @@ class DeadlockDetector:
     ) -> dict[str, set[str]]:
         """Build dependencies between agents based on occupied destinations."""
 
-        original_positions = {
-            agent.id: agent.position
+        original_positions = {agent.id: agent.position for agent in state.agents}
+        # A wait-for edge is meaningful only when the blocking agent is also
+        # trying to move.  Treating every occupied cell as a dependency makes
+        # a moving agent appear to be deadlocked behind a stationary/completed
+        # agent, even though that is an ordinary collision to resolve.
+        moving_agents = {
+            agent.id
             for agent in state.agents
+            if agent.status != "completed"
+            and proposals.get(agent.id, agent.position) != agent.position
         }
 
         dependencies = {}
@@ -94,8 +101,25 @@ class DeadlockDetector:
                 if other_id == agent_id:
                     continue
 
-                if destination == other_position:
+                if other_id in moving_agents and destination == other_position:
                     dependencies.setdefault(agent_id, set()).add(other_id)
+
+        # A shared destination is a real mutual wait when every participant
+        # is moving.  Represent it explicitly so a persistent vertex conflict
+        # can be recovered instead of being counted as an unbounded sequence
+        # of ordinary blocked frames.
+        destination_groups: dict[tuple[int, int], list[str]] = {}
+        for agent_id, destination in proposals.items():
+            if agent_id in moving_agents:
+                destination_groups.setdefault(
+                    (destination.x, destination.y), []
+                ).append(agent_id)
+        for group in destination_groups.values():
+            if len(group) > 1:
+                for agent_id in group:
+                    dependencies.setdefault(agent_id, set()).update(
+                        other_id for other_id in group if other_id != agent_id
+                    )
 
         return dependencies
 

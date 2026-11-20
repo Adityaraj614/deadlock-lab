@@ -322,8 +322,8 @@ def test_load_narrow_corridor():
     env = load_scenario("narrow_corridor", base_dir=base_dir)
     assert env.grid_width == 5
     assert env.grid_height == 10
-    assert len(env.obstacles) == 4
-    assert len(env.agents) == 3
+    assert len(env.obstacles) == 18
+    assert len(env.agents) == 2
 
 
 def test_load_congested_warehouse():

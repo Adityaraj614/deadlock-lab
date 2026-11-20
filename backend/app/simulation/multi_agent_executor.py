@@ -244,12 +244,12 @@ class MultiAgentExecutor:
 
         vertex_conflicts = MultiAgentExecutor.detect_vertex_conflicts(proposals)
 
-        if strategy == CoordinationStrategy.FULL or strategy == CoordinationStrategy.DEADLOCK:
-            edge_conflicts = MultiAgentExecutor.detect_edge_conflicts(
-                state, proposals
-            )
-        else:
-            edge_conflicts = set()
+        # Vertex and edge safety are invariants for every strategy.  The
+        # strategy controls additional coordination behaviour, never whether
+        # an unsafe head-on swap is allowed.
+        edge_conflicts = MultiAgentExecutor.detect_edge_conflicts(
+            state, proposals
+        )
 
         if strategy == CoordinationStrategy.FULL or strategy == CoordinationStrategy.PRIORITY:
             occupied_conflicts = (
@@ -401,7 +401,10 @@ class MultiAgentExecutor:
         )
 
         # Step 3: Check reservation table for additional conflicts.
-        if reservation_table is not None and strategy == CoordinationStrategy.FULL:
+        if reservation_table is not None and strategy in {
+            CoordinationStrategy.FULL,
+            CoordinationStrategy.RESERVATION,
+        }:
             res_conflicts: set[str] = set()
             for agent_id, destination in proposals.items():
                 agent = next(
@@ -427,18 +430,19 @@ class MultiAgentExecutor:
             conflicts |= res_conflicts
 
         # Step 4: Detect deadlocked agents.
-        if strategy == CoordinationStrategy.FULL or strategy == CoordinationStrategy.DEADLOCK:
-            deadlocked_agents = DeadlockDetector.detect_deadlocks(
-                state, proposals
-            )
-        else:
-            deadlocked_agents = set()
+        # Deadlock detection is a safety/liveness check shared by all
+        # strategies.  Strategies differ in reservation and priority policy,
+        # but none should be allowed to remain in an actual cycle forever.
+        deadlocked_agents = DeadlockDetector.detect_deadlocks(state, proposals)
 
         # Step 5: Combine movement conflicts and deadlocks.
         all_blocked_agents = conflicts | deadlocked_agents
 
         # Step 6: Update reservation table with non-conflicting proposals.
-        if reservation_table is not None and strategy == CoordinationStrategy.FULL:
+        if reservation_table is not None and strategy in {
+            CoordinationStrategy.FULL,
+            CoordinationStrategy.RESERVATION,
+        }:
             # Reserve vertices and edges for agents not in the blocked set.
             for agent_id, destination in proposals.items():
                 if agent_id in all_blocked_agents:
@@ -476,21 +480,40 @@ class MultiAgentExecutor:
             if metrics is not None and hasattr(metrics, "record_deadlock_incident"):
                 is_new_incident = metrics.record_deadlock_incident(deadlocked_agents)
             if is_new_incident:
+                positions_before_recovery = {
+                    agent.id: agent.position for agent in new_state.agents
+                }
                 recovered = DeadlockResolver.recover_deadlock(
                     new_state,
                     deadlocked_agents,
                     grid_width,
                     grid_height,
+                    {
+                        (destination.x, destination.y)
+                        for agent_id, destination in proposals.items()
+                    },
                 )
                 if metrics is not None and hasattr(metrics, "record_deadlock_recovery_attempt"):
                     metrics.record_deadlock_recovery_attempt()
                 if recovered:
+                    # Re-check the original movement intent after the yield
+                    # move.  Passing current positions here would always
+                    # produce an empty graph and falsely report success.
+                    post_recovery_proposals = dict(proposals)
+                    for agent in new_state.agents:
+                        if agent.position != positions_before_recovery[agent.id]:
+                            post_recovery_proposals[agent.id] = agent.position
                     remaining = DeadlockDetector.detect_deadlocks(
-                        new_state,
-                        {agent.id: agent.position for agent in new_state.agents},
+                        new_state, post_recovery_proposals
                     )
                     if not remaining and metrics is not None and hasattr(metrics, "record_successful_recovery"):
                         metrics.record_successful_recovery()
+                    # The yield move changes the incident state.  Close this
+                    # incident so a later, genuinely re-formed cycle can be
+                    # distinguished from repeated detection of the same
+                    # unchanged frame.
+                    if metrics is not None and hasattr(metrics, "clear_deadlock_incident"):
+                        metrics.clear_deadlock_incident()
         elif metrics is not None and hasattr(metrics, "clear_deadlock_incident"):
             metrics.clear_deadlock_incident()
 

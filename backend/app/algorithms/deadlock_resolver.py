@@ -40,6 +40,7 @@ class DeadlockResolver:
         agent: Agent,
         grid_width: int,
         grid_height: int,
+        forbidden_positions: set[tuple[int, int]] | None = None,
     ) -> list[Position]:
 
         safe_positions = []
@@ -68,6 +69,9 @@ class DeadlockResolver:
             if (x, y) in obstacle_positions:
                 continue
 
+            if forbidden_positions and (x, y) in forbidden_positions:
+                continue
+
             safe_positions.append(Position(x=x, y=y))
 
         return safe_positions
@@ -77,6 +81,7 @@ class DeadlockResolver:
     def select_yield_position(
         safe_positions: list[Position],
         agent: Agent,
+        prefer_lateral: bool = False,
     ) -> Position | None:
 
         if not safe_positions:
@@ -85,6 +90,9 @@ class DeadlockResolver:
         return min(
             safe_positions,
             key=lambda position: (
+                # Prefer a lateral bay during active recovery.  The default
+                # retains the original deterministic nearest-goal tie-break.
+                int(prefer_lateral and position.x == agent.position.x),
                 abs(position.x - agent.goal.x)
                 + abs(position.y - agent.goal.y)
             ),
@@ -127,6 +135,7 @@ class DeadlockResolver:
         deadlocked_agents: set[str],
         grid_width: int,
         grid_height: int,
+        forbidden_positions: set[tuple[int, int]] | None = None,
     ) -> bool:
         """Perform one rule-based deadlock recovery operation."""
 
@@ -144,6 +153,7 @@ class DeadlockResolver:
             yielding_agent,
             grid_width,
             grid_height,
+            forbidden_positions,
         )
 
         if not safe_positions:
@@ -153,6 +163,7 @@ class DeadlockResolver:
         destination = DeadlockResolver.select_yield_position(
             safe_positions,
             yielding_agent,
+            prefer_lateral=True,
         )
 
         if destination is None:
