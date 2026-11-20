@@ -15,10 +15,10 @@ from enum import Enum
 class CoordinationStrategy(Enum):
     """Supported coordination strategies for multi-agent simulation."""
 
-    FULL = "full"  # Full integration: conflicts + reservation table + deadlocks
-    PRIORITY = "priority"  # Priority-based: conflicts + priorities, no deadlock check
-    RESERVATION = "reservation"  # Reservation-based: only reservation table checks
-    DEADLOCK = "deadlock"  # Deadlock-aware: conflicts + deadlock detection only
+    FULL = "full"  # Priority arbitration + reservations + deadlock recovery.
+    PRIORITY = "priority"  # Priority arbitration + collision prevention.
+    RESERVATION = "reservation"  # Time-based reservations + collision prevention.
+    DEADLOCK = "deadlock"  # Collision prevention + deadlock recovery.
 
 
 class MultiAgentExecutor:
@@ -224,7 +224,7 @@ class MultiAgentExecutor:
     @staticmethod
     def resolve_conflicts(
         state: SimulationState,
-        proposals: dict[str, int],
+        proposals: dict[str, Position],
         strategy: CoordinationStrategy = CoordinationStrategy.FULL,
     ) -> set[str]:
         """Identify all agents involved in movement conflicts.
@@ -244,6 +244,69 @@ class MultiAgentExecutor:
 
         vertex_conflicts = MultiAgentExecutor.detect_vertex_conflicts(proposals)
 
+        # FULL and PRIORITY arbitrate a shared empty destination instead of
+        # blocking every contender.  A stationary occupant remains an
+        # invariant violation: the movers must wait rather than displace it.
+        if strategy in {
+            CoordinationStrategy.FULL,
+            CoordinationStrategy.PRIORITY,
+            CoordinationStrategy.RESERVATION,
+        }:
+            original_positions = {agent.id: agent.position for agent in state.agents}
+            agent_by_id = {agent.id: agent for agent in state.agents}
+            destinations: dict[tuple[int, int], list[str]] = {}
+            for agent_id, destination in proposals.items():
+                destinations.setdefault((destination.x, destination.y), []).append(agent_id)
+
+            vertex_conflicts = set()
+            for agent_ids in destinations.values():
+                if len(agent_ids) < 2:
+                    continue
+                movers = [
+                    agent_id
+                    for agent_id in agent_ids
+                    if proposals[agent_id] != original_positions[agent_id]
+                ]
+                if len(movers) != len(agent_ids):
+                    vertex_conflicts.update(movers)
+                    continue
+                preferred_movers = [
+                    agent_id
+                    for agent_id in movers
+                    if agent_by_id[agent_id].status != AgentStatus.BLOCKED
+                ] or movers
+                priorities = {
+                    agent_by_id[agent_id].priority for agent_id in preferred_movers
+                }
+                if strategy in {
+                    CoordinationStrategy.FULL,
+                    CoordinationStrategy.PRIORITY,
+                } and (
+                    len(priorities) > 1
+                    or len(preferred_movers) < len(movers)
+                    or strategy == CoordinationStrategy.PRIORITY
+                ):
+                    winner = min(
+                        preferred_movers,
+                        key=lambda agent_id: (
+                            agent_by_id[agent_id].priority,
+                            agent_id,
+                        ),
+                    )
+                    vertex_conflicts.update(
+                        agent_id for agent_id in movers if agent_id != winner
+                    )
+                elif strategy == CoordinationStrategy.RESERVATION:
+                    # Simultaneous contenders are committed in deterministic
+                    # agent order; this is the same arbitration a reservation
+                    # table provides when it accepts the first proposal.
+                    winner = min(movers)
+                    vertex_conflicts.update(
+                        agent_id for agent_id in movers if agent_id != winner
+                    )
+                else:
+                    vertex_conflicts.update(movers)
+
         # Vertex and edge safety are invariants for every strategy.  The
         # strategy controls additional coordination behaviour, never whether
         # an unsafe head-on swap is allowed.
@@ -251,14 +314,9 @@ class MultiAgentExecutor:
             state, proposals
         )
 
-        if strategy == CoordinationStrategy.FULL or strategy == CoordinationStrategy.PRIORITY:
-            occupied_conflicts = (
-                MultiAgentExecutor.detect_occupied_destination_conflicts(
-                    state, proposals
-                )
-            )
-        else:
-            occupied_conflicts = set()
+        occupied_conflicts = MultiAgentExecutor.detect_occupied_destination_conflicts(
+            state, proposals
+        )
 
         all_conflicts = vertex_conflicts | edge_conflicts | occupied_conflicts
 
@@ -326,7 +384,9 @@ class MultiAgentExecutor:
         conflicting: set[str] = set()
         existing_agent = reservation_table._vertex_reservations.get(key)
         if existing_agent and existing_agent != agent_id:
-            conflicting.add(existing_agent)
+            # The proposer is the robot that must wait; the existing owner
+            # already has the reservation it is entitled to use.
+            conflicting.add(agent_id)
         return conflicting
 
     @staticmethod
@@ -350,8 +410,18 @@ class MultiAgentExecutor:
         )
         conflicting: set[str] = set()
         existing_agent = reservation_table._edge_reservations.get(key)
+        reverse_key = EdgeKey(
+            from_x=to_position.x,
+            from_y=to_position.y,
+            to_x=from_position.x,
+            to_y=from_position.y,
+            time=time,
+        )
+        reverse_agent = reservation_table._edge_reservations.get(reverse_key)
         if existing_agent and existing_agent != agent_id:
-            conflicting.add(existing_agent)
+            conflicting.add(agent_id)
+        if reverse_agent and reverse_agent != agent_id:
+            conflicting.add(agent_id)
         return conflicting
 
     # ------------------------------------------------------------------
@@ -399,6 +469,9 @@ class MultiAgentExecutor:
         conflicts = MultiAgentExecutor.resolve_conflicts(
             state, proposals, strategy
         )
+        edge_conflicts = MultiAgentExecutor.detect_edge_conflicts(
+            state, proposals
+        )
 
         # Step 3: Check reservation table for additional conflicts.
         if reservation_table is not None and strategy in {
@@ -428,12 +501,33 @@ class MultiAgentExecutor:
                 res_conflicts |= e_conf
 
             conflicts |= res_conflicts
+            if res_conflicts:
+                original_positions = {agent.id: agent.position for agent in state.agents}
+                for agent_id, destination in proposals.items():
+                    if agent_id in res_conflicts:
+                        conflicts.update(
+                            other_id
+                            for other_id, other_destination in proposals.items()
+                            if other_destination == destination
+                            and other_destination != original_positions[other_id]
+                        )
 
-        # Step 4: Detect deadlocked agents.
-        # Deadlock detection is a safety/liveness check shared by all
-        # strategies.  Strategies differ in reservation and priority policy,
-        # but none should be allowed to remain in an actual cycle forever.
-        deadlocked_agents = DeadlockDetector.detect_deadlocks(state, proposals)
+        # Step 4: DEADLOCK and FULL explicitly enable cycle detection and
+        # recovery.  PRIORITY and RESERVATION retain collision prevention but
+        # do not silently acquire the deadlock strategy's behavior.
+        deadlock_enabled = strategy in {
+            CoordinationStrategy.FULL,
+            CoordinationStrategy.DEADLOCK,
+        }
+        deadlocked_agents = (
+            DeadlockDetector.detect_deadlocks(
+                state,
+                proposals,
+                include_shared_destinations=True,
+            )
+            if deadlock_enabled
+            else set()
+        )
 
         # Step 5: Combine movement conflicts and deadlocks.
         all_blocked_agents = conflicts | deadlocked_agents
@@ -473,9 +567,32 @@ class MultiAgentExecutor:
             state, proposals, all_blocked_agents
         )
 
+        # PRIORITY and RESERVATION still need a deterministic way to clear a
+        # safe head-on blockage, but they do not run the deadlock detector or
+        # record deadlock metrics.  This is collision recovery, not their
+        # defining coordination mechanism.
+        if not deadlock_enabled and edge_conflicts:
+            positions_before_yield = {
+                agent.id: agent.position for agent in new_state.agents
+            }
+            recovered = DeadlockResolver.recover_deadlock(
+                new_state,
+                edge_conflicts,
+                grid_width,
+                grid_height,
+                {
+                    (destination.x, destination.y)
+                    for destination in proposals.values()
+                },
+            )
+            if recovered:
+                for agent in new_state.agents:
+                    if agent.position != positions_before_yield[agent.id]:
+                        agent.status = AgentStatus.BLOCKED
+
         # Recover only a newly observed deadlock. A persistent cycle is kept
         # active in the metrics object and is not counted repeatedly.
-        if deadlocked_agents and metrics is not None:
+        if deadlock_enabled and deadlocked_agents and metrics is not None:
             is_new_incident = True
             if metrics is not None and hasattr(metrics, "record_deadlock_incident"):
                 is_new_incident = metrics.record_deadlock_incident(deadlocked_agents)
@@ -496,6 +613,9 @@ class MultiAgentExecutor:
                 if metrics is not None and hasattr(metrics, "record_deadlock_recovery_attempt"):
                     metrics.record_deadlock_recovery_attempt()
                 if recovered:
+                    for agent in new_state.agents:
+                        if agent.position != positions_before_recovery[agent.id]:
+                            agent.status = AgentStatus.BLOCKED
                     # Re-check the original movement intent after the yield
                     # move.  Passing current positions here would always
                     # produce an empty graph and falsely report success.
@@ -504,7 +624,9 @@ class MultiAgentExecutor:
                         if agent.position != positions_before_recovery[agent.id]:
                             post_recovery_proposals[agent.id] = agent.position
                     remaining = DeadlockDetector.detect_deadlocks(
-                        new_state, post_recovery_proposals
+                        new_state,
+                        post_recovery_proposals,
+                        include_shared_destinations=True,
                     )
                     if not remaining and metrics is not None and hasattr(metrics, "record_successful_recovery"):
                         metrics.record_successful_recovery()

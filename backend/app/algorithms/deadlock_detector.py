@@ -76,6 +76,7 @@ class DeadlockDetector:
     def build_waiting_dependencies(
         state: SimulationState,
         proposals: dict[str, Position],
+        include_shared_destinations: bool = False,
     ) -> dict[str, set[str]]:
         """Build dependencies between agents based on occupied destinations."""
 
@@ -104,22 +105,19 @@ class DeadlockDetector:
                 if other_id in moving_agents and destination == other_position:
                     dependencies.setdefault(agent_id, set()).add(other_id)
 
-        # A shared destination is a real mutual wait when every participant
-        # is moving.  Represent it explicitly so a persistent vertex conflict
-        # can be recovered instead of being counted as an unbounded sequence
-        # of ordinary blocked frames.
-        destination_groups: dict[tuple[int, int], list[str]] = {}
-        for agent_id, destination in proposals.items():
-            if agent_id in moving_agents:
-                destination_groups.setdefault(
-                    (destination.x, destination.y), []
-                ).append(agent_id)
-        for group in destination_groups.values():
-            if len(group) > 1:
-                for agent_id in group:
-                    dependencies.setdefault(agent_id, set()).update(
-                        other_id for other_id in group if other_id != agent_id
-                    )
+        if include_shared_destinations:
+            destination_groups: dict[tuple[int, int], list[str]] = {}
+            for agent_id, destination in proposals.items():
+                if agent_id in moving_agents:
+                    destination_groups.setdefault(
+                        (destination.x, destination.y), []
+                    ).append(agent_id)
+            for group in destination_groups.values():
+                if len(group) > 1:
+                    for agent_id in group:
+                        dependencies.setdefault(agent_id, set()).update(
+                            other_id for other_id in group if other_id != agent_id
+                        )
 
         return dependencies
 
@@ -128,11 +126,12 @@ class DeadlockDetector:
     def detect_deadlocks(
         state: SimulationState,
         proposals: dict[str, Position],
+        include_shared_destinations: bool = False,
     ) -> set[str]:
         """Detect deadlocked agents from simulation state and proposals."""
 
         dependencies = DeadlockDetector.build_waiting_dependencies(
-            state, proposals
+            state, proposals, include_shared_destinations
         )
 
         graph = DeadlockDetector.build_wait_for_graph(dependencies)

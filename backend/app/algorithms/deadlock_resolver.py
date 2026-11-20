@@ -29,10 +29,7 @@ class DeadlockResolver:
         if not candidates:
             return None
 
-        return min(
-            candidates,
-            key=lambda agent: (agent.priority, agent.id),
-        )
+        return min(candidates, key=lambda agent: (agent.priority, agent.id))
 
     @staticmethod
     def find_safe_positions(
