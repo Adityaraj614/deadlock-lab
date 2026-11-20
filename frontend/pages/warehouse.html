@@ -23,7 +23,6 @@
                     <span class="status-dot disconnected" id="api-status"></span>
                     <span class="status-text">Disconnected</span>
                 </span>
-                <button class="btn btn-secondary" onclick="navigateBackHome()">Back to Home</button>
             </div>
         </header>
         
@@ -39,6 +38,7 @@
                         <div class="nav-items">
                             <button class="nav-item active" data-view="simulation">Simulation</button>
                             <button class="nav-item" data-view="experiments">Experiments</button>
+                            <button class="nav-item" data-view="scenario-builder">Scenario Builder</button>
                         </div>
                     </div>
 
@@ -230,6 +230,20 @@
                         <div id="experiment-history-list" class="history-list"><span class="table-empty">No experiment runs yet.</span></div>
                     </section>
                 </section>
+
+                <section id="scenario-builder-view" class="scenario-builder-view hidden" aria-labelledby="scenario-builder-title">
+                    <div class="workspace-header">
+                        <h2 id="scenario-builder-title">Scenario Builder</h2>
+                        <div class="scenario-info">
+                            <span class="scenario-name">Custom environments</span>
+                            <span class="grid-dimensions">Coming Soon</span>
+                        </div>
+                    </div>
+                    <div class="scenario-builder-placeholder">
+                        <span class="coming-soon-badge">Coming Soon</span>
+                        <p>Create custom warehouse environments by designing grid layouts, placing obstacles, defining robot start and goal positions, and configuring multiple agents.</p>
+                    </div>
+                </section>
             </main>
             
             <!----- E. Right Information Panel (~290px) ----->
@@ -243,7 +257,7 @@
                 </div>
                 
                 <!-- Agent Information Section -->
-                <div class="info-section" id="info-agents">
+                <div class="info-section hidden" id="info-agents">
                     <div class="section-title">Agent Information</div>
                     <div class="content" id="info-agents-content">
                         <p>No agents loaded</p>
@@ -251,7 +265,7 @@
                 </div>
                 
                 <!-- Selected Agent Details Section -->
-                <div class="info-section" id="info-selected">
+                <div class="info-section hidden" id="info-selected">
                     <div class="section-title">Selected Agent</div>
                     <div class="content" id="info-selected-agent">
                         <p>No agent selected</p>
@@ -267,7 +281,7 @@
                 </div>
                 
                 <!-- Recent Events Section -->
-                <div class="info-section" id="info-events">
+                <div class="info-section hidden" id="info-events">
                     <div class="section-title">Recent Events</div>
                     <div class="content" id="info-events-content">
                         <p>No events</p>

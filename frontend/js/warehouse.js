@@ -13,6 +13,7 @@ import {
 import { navigateBackHome } from './navigation.js';
 
 let currentState = null;
+let recentEvents = [];
 let experimentRunning = false;
 const experimentStrategies = ['full', 'priority', 'reservation', 'deadlock'];
 const experimentMetricDefinitions = [
@@ -46,14 +47,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function showView(view) {
     const experiments = view === 'experiments';
-    document.getElementById('simulation-view')?.classList.toggle('hidden', experiments);
+    const scenarioBuilder = view === 'scenario-builder';
+    const workspaceView = experiments || scenarioBuilder;
+    document.getElementById('simulation-view')?.classList.toggle('hidden', workspaceView);
     document.getElementById('experiments-view')?.classList.toggle('hidden', !experiments);
-    document.querySelector('.side-panel')?.classList.toggle('hidden', experiments);
+    document.getElementById('scenario-builder-view')?.classList.toggle('hidden', !scenarioBuilder);
+    document.querySelector('.side-panel')?.classList.toggle('hidden', workspaceView);
     document.querySelectorAll('.nav-item[data-view]').forEach(item => {
         item.classList.toggle('active', item.dataset.view === view);
     });
     const status = document.getElementById('info-status-text');
-    if (!experiments && status) status.innerHTML = '<p>Simulation stopped</p>';
+    if (!workspaceView && status) status.innerHTML = '<p>Simulation stopped</p>';
 }
 
 function selectedStrategy() {
@@ -250,6 +254,7 @@ async function request(operation, message) {
     setBusy(true);
     try {
         const state = await operation();
+        if (message === 'Scenario loaded' || message === 'Simulation reset') clearEvents();
         currentState = state;
         renderState(state);
         addEvent(`${message} at step ${state.current_step}`);
@@ -308,9 +313,16 @@ function renderState(state) {
     document.getElementById('scenario-name').textContent = state.scenario || 'Warehouse';
     document.getElementById('grid-dimensions').textContent = `${width}x${height} Grid`;
     document.getElementById('simulation-state').textContent = state.status || 'ready';
+    setInfoSectionVisible('info-agents', state.agents.length > 0);
+    setInfoSectionVisible('info-selected', false);
     document.getElementById('info-scenario-details').innerHTML = `<p>${width}x${height} grid<br>${state.agents.length} robots<br>${state.obstacles.length} obstacles<br>${state.goals.length} goals</p>`;
     document.getElementById('info-agents-content').innerHTML = state.agents.map(agent => `<p>${agent.id}: (${agent.position.x}, ${agent.position.y}) → (${agent.goal.x}, ${agent.goal.y})<br><small>${agent.status}</small></p>`).join('');
+    document.getElementById('info-status-text').innerHTML = `<p>${state.status || 'ready'} · step ${state.current_step ?? 0}</p>`;
     updateMetrics(state.metrics || {});
+}
+
+function setInfoSectionVisible(id, visible) {
+    document.getElementById(id)?.classList.toggle('hidden', !visible);
 }
 
 function drawCells(context, items, cell, color, label) {
@@ -349,7 +361,23 @@ function updateMetrics(metrics) {
 function addEvent(message) {
     const log = document.getElementById('event-log-body');
     if (!log) return;
+    recentEvents.unshift(message);
+    recentEvents = recentEvents.slice(0, 5);
     const entry = document.createElement('div');
     entry.textContent = message;
     log.prepend(entry);
+    const recent = document.getElementById('info-events-content');
+    if (recent) {
+        recent.innerHTML = recentEvents.map(event => `<p>${event}</p>`).join('');
+        setInfoSectionVisible('info-events', true);
+    }
+}
+
+function clearEvents() {
+    recentEvents = [];
+    const log = document.getElementById('event-log-body');
+    if (log) log.innerHTML = '<span>Select a scenario to begin simulation</span>';
+    const recent = document.getElementById('info-events-content');
+    if (recent) recent.innerHTML = '<p>No events</p>';
+    setInfoSectionVisible('info-events', false);
 }
